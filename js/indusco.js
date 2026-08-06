@@ -492,6 +492,73 @@ export async function submitInduscoRequest() {
     await window.customAlert('Zapotrzebowanie zostało wysłane i dodane do alertów. Zniknie automatycznie po dodaniu dostawy ("Wydanie").');
 }
 
+export function renderNotificationsList() {
+    const container = document.getElementById('notificationsList');
+    if (!container) return;
+
+    let html = '';
+
+    // 1. Alerty remanentowe
+    if (activeRemanentAlerts && activeRemanentAlerts.length > 0) {
+        activeRemanentAlerts.forEach(alert => {
+            html += `
+                <div class="flex justify-between items-center p-2 border border-black bg-yellow-50">
+                    <div>
+                        <span class="font-bold text-xs uppercase">Remanent: ${escapeHTML(alert.paintType)}</span>
+                        <div class="text-[10px] text-gray-600">Zgłoszono: ${alert.date} przez ${escapeHTML(alert.author || 'System')}</div>
+                    </div>
+                    <button onclick="acknowledgeRemanent('${alert.id}')" class="bg-black text-white px-2 py-1 text-[10px] uppercase font-bold hover:bg-gray-800">Potwierdź</button>
+                </div>
+            `;
+        });
+    }
+
+    // 2. Alerty ujemnego stanu magazynowego
+    if (window.currentNegativeAlerts && window.currentNegativeAlerts.length > 0) {
+        window.currentNegativeAlerts.forEach(neg => {
+            html += `
+                <div class="flex justify-between items-center p-2 border border-black bg-red-50">
+                    <div>
+                        <span class="font-bold text-xs text-red-700 uppercase">Ujemny stan: ${escapeHTML(neg.paint)}</span>
+                        <div class="text-[10px] text-red-600">Aktualny stan: ${formatNumber(neg.stock, 1)} L</div>
+                    </div>
+                    <span class="text-[10px] font-bold uppercase bg-red-200 px-2 py-1 border border-black">Alarm</span>
+                </div>
+            `;
+        });
+    }
+
+    // 3. Aktywne zapotrzebowania Indusco
+    if (activeInduscoRequests && activeInduscoRequests.length > 0) {
+        activeInduscoRequests.forEach(req => {
+            html += `
+                <div class="flex justify-between items-center p-2 border border-black bg-blue-50">
+                    <div>
+                        <span class="font-bold text-xs text-blue-800 uppercase">Zapotrzebowanie Indusco: ${escapeHTML(req.paintType)}</span>
+                        <div class="text-[10px] text-gray-600">Zgłoszono: ${req.date} przez ${escapeHTML(req.author || 'System')}</div>
+                    </div>
+                    <span class="text-[10px] font-bold uppercase bg-blue-200 px-2 py-1 border border-black">Oczekuje</span>
+                </div>
+            `;
+        });
+    }
+
+    if (!html) {
+        html = `<div class="text-center py-4 font-bold text-xs uppercase text-gray-500">Brak nowych powiadomień i alertów.</div>`;
+    }
+
+    container.innerHTML = html;
+}
+
+export function openNotificationsModal() { 
+    const m = document.getElementById('notificationsModal'); 
+    if (m) { 
+        m.classList.remove('hidden'); 
+        m.classList.add('flex'); 
+        renderNotificationsList(); 
+    } 
+}
+
 // ==========================================
 // 5. ROZLICZENIA DZIENNE (GLOBALNE I INDUSCO)
 // ==========================================
@@ -836,3 +903,14 @@ window.removeInduscoDailyRow = removeInduscoDailyRow;
 window.updateInduscoDailyRecord = updateInduscoDailyRecord;
 window.changeInduscoMonth = changeInduscoMonth;
 window.renderDailyInduscoLedger = renderDailyInduscoLedger;
+window.renderNotificationsList = renderNotificationsList;
+window.openNotificationsModal = openNotificationsModal;
+
+// ==========================================
+// UDOSTĘPNIENIE FUNKCJI DLA PLIKU HTML
+// ==========================================
+window.submitInduscoRequest = submitInduscoRequest;
+window.saveBulkIndusco = saveBulkIndusco;
+window.handleInduscoActionChange = handleInduscoActionChange;
+window.saveEditIndusco = saveEditIndusco;
+window.changeInduscoMonth = changeInduscoMonth;

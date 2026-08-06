@@ -47,7 +47,6 @@ export async function saveToSummaryInternal() {
         currentUnits[unitKey].brandStats[brandKey].colors[cName] = (currentUnits[unitKey].brandStats[brandKey].colors[cName] || 0) + vol;
     });
     
-    const currentYear = new Date().getFullYear();
     const generatedNumbers = [];
 
     let existingEntryIndex = window.editingProtocolId ? printHistory.findIndex(e => e.id.toString() === window.editingProtocolId.toString()) : -1;
@@ -77,24 +76,54 @@ export async function saveToSummaryInternal() {
         generatedNumbers.push(oldEntry.protocolNumber);
         if (window.cancelEditMode) window.cancelEditMode();
     } else {
+        // Logika generowania dynamicznego numeru Protokołu wg miesiąca i roku
+        const parts = dateStr.split('.');
+        const monthStr = parts[1] || String(new Date().getMonth() + 1).padStart(2, '0');
+        const yearStr = parts[2] || String(new Date().getFullYear());
+        const suffix = `/${monthStr}/${yearStr}`;
+
+        // Szukanie najwyższego numeru z tego konkretnego miesiąca
+        let maxNum = 0;
+        printHistory.forEach(entry => {
+            if (entry.protocolNumber && entry.protocolNumber.endsWith(suffix)) {
+                const numPart = parseInt(entry.protocolNumber.split('/')[0]);
+                if (!isNaN(numPart) && numPart > maxNum) {
+                    maxNum = numPart;
+                }
+            }
+        });
+        
+        let currentMonthCounter = maxNum;
+
         for (const [uKey, data] of Object.entries(currentUnits)) {
             let totalThinner = 0;
             currentPaintTypes.forEach(pt => {
                 if(data.brandStats[pt.id]) { data.brandStats[pt.id].thinner = data.brandStats[pt.id].vol * (data.brandStats[pt.id].pct / 100); totalThinner += data.brandStats[pt.id].thinner; }
             });
-            // Używamy globalnego licznika (ponieważ to typ prosty let, modyfikujemy przez obiekt configu lub window, uprościmy przypisując do store)
-            let newCounter = protocolCounter + 1;
-            const newProtocolNumber = `${newCounter}/${currentYear}`;
+            
+            // Podnosimy licznik miesięczny o 1 dla każdej nowej pozycji
+            currentMonthCounter++;
+            const newProtocolNumber = `${currentMonthCounter}${suffix}`;
             generatedNumbers.push(newProtocolNumber);
+            
             printHistory.push({
-                id: Date.now() + Math.random().toString(36).substr(2, 9), protocolNumber: newProtocolNumber, projectName: data.projectName, date: dateStr, unit: data.projectName, area: data.area, cost: data.cost, areaBlachy: data.areaBlachy, areaProfile: data.areaProfile, brandStats: data.brandStats, thinnerVol: totalThinner, isError: false, author: currentUser ? (currentUser.name || currentUser.login) : "Nieznany", items: JSON.parse(JSON.stringify(data.items)), appliedRates: appliedRates, lastModified: Date.now()
+                id: Date.now() + Math.random().toString(36).substr(2, 9), 
+                protocolNumber: newProtocolNumber, 
+                projectName: data.projectName, 
+                date: dateStr, 
+                unit: data.projectName, 
+                area: data.area, 
+                cost: data.cost, 
+                areaBlachy: data.areaBlachy, 
+                areaProfile: data.areaProfile, 
+                brandStats: data.brandStats, 
+                thinnerVol: totalThinner, 
+                isError: false, 
+                author: currentUser ? (currentUser.name || currentUser.login) : "Nieznany", 
+                items: JSON.parse(JSON.stringify(data.items)), 
+                appliedRates: appliedRates, 
+                lastModified: Date.now()
             });
-            // Update the real counter in store by saving it back indirectly or updating state
-            if (window.getProjectState) {
-                let state = window.getProjectState();
-                state.protocolCounter = newCounter;
-                // Hacky way but effective without rewriting all getters/setters
-            }
         }
     }
     
@@ -170,6 +199,10 @@ export async function loadHistoryItem(id, sourceTab = 'history') {
     window.isPreviewMode = true; 
     window.currentPreviewProtocolNumber = entry.protocolNumber || "-";
     
+    // Wpisanie numeru protokołu i projektu do elementów UI
+    document.querySelectorAll('.print-protocol-number').forEach(el => el.textContent = window.currentPreviewProtocolNumber);
+    document.querySelectorAll('.print-project-name').forEach(el => el.textContent = projName || "-");
+    
     document.getElementById('addFormContainer').classList.add('hidden'); 
     document.getElementById('previewBanner').classList.remove('hidden'); 
     document.getElementById('previewBanner').classList.add('flex');
@@ -216,6 +249,10 @@ export async function editHistoryItem(id, sourceTab = 'history') {
     window.currentPreviewProtocolNumber = entry.protocolNumber || "-"; 
     window.editingProtocolId = id; 
     
+    // Wpisanie numeru protokołu i projektu do elementów UI w trybie edycji
+    document.querySelectorAll('.print-protocol-number').forEach(el => el.textContent = window.currentPreviewProtocolNumber);
+    document.querySelectorAll('.print-project-name').forEach(el => el.textContent = projName || "-");
+    
     const btnCancel = document.getElementById('btnCancelEdit');
     if (btnCancel) btnCancel.classList.remove('hidden');
 
@@ -233,6 +270,10 @@ export function exitPreviewMode() {
     window.isPreviewMode = false; 
     window.currentPreviewProtocolNumber = null;
     document.getElementById('protocolDateInput').disabled = false;
+    
+    // Wyczyszczenie etykiet po wyjściu z podglądu
+    document.querySelectorAll('.print-protocol-number').forEach(el => el.textContent = "");
+    document.querySelectorAll('.print-project-name').forEach(el => el.textContent = "");
     
     if (window.tempInputData) { 
         setInputData(window.tempInputData); 
@@ -384,7 +425,6 @@ export function renderHistoryTable() {
 }
 
 export async function exportHistoryToExcel() {
-    // Ponownie filtrujemy żeby wyeksportować dokładnie to, co jest widoczne w tabeli
     const fDateFromStr = document.getElementById('histFilterDateFrom').value;
     const fDateToStr = document.getElementById('histFilterDateTo').value;
     const fUnit = document.getElementById('histFilterUnit').value.trim().toLowerCase();
@@ -415,7 +455,6 @@ export async function exportHistoryToExcel() {
         return rowExport;
     });
 
-    // Pamiętaj, że biblioteka XLSX musi być załadowana w tagu <script> w index.html
     if (typeof window.XLSX === 'undefined') { await window.customAlert("Biblioteka Excela nie została załadowana!"); return; }
 
     const ws = window.XLSX.utils.json_to_sheet(exportData);

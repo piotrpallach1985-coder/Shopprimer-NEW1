@@ -102,6 +102,11 @@ export function switchTab(tabId, bypassCheck = false) {
     if (tabId === 'db' && window.renderDbTable) window.renderDbTable();
     if (tabId === 'colors' && window.renderColorsTable) window.renderColorsTable();
     if (tabId === 'costs' && window.renderPaintTypesTable) window.renderPaintTypesTable();
+    
+    if (tabId === 'users') {
+        if (window.renderUserPreferences) window.renderUserPreferences();
+        if (window.renderUsersTable) window.renderUsersTable();
+    }
 }
 
 // ==========================================
@@ -233,6 +238,29 @@ export function editUser(login) {
     const adminCb = document.getElementById('editUserAdmin');
     adminCb.checked = u.role === 'admin';
     
+    // Generowanie siatki zakładek w oknie edycji
+    const tabsContainer = document.getElementById('editUserTabsGrid');
+    if (tabsContainer) {
+        const allTabs = AVAILABLE_TABS.map(t => t);
+        allTabs.push({ id: 'users', name: 'Ustawienia' });
+        
+        const allowed = u.allowedTabs || allTabs.map(t => t.id);
+        
+        let html = '';
+        allTabs.forEach(tab => {
+            const isChecked = allowed.includes(tab.id);
+            html += `
+                <label class="flex items-center gap-2 cursor-pointer bg-white p-1.5 border border-black hover:bg-gray-100">
+                    <input type="checkbox" class="edit-user-tab-cb w-4 h-4 cursor-pointer" value="${tab.id}" ${isChecked ? 'checked' : ''}>
+                    <span class="text-[11px] font-bold uppercase">${tab.name || tab.id}</span>
+                </label>
+            `;
+        });
+        tabsContainer.innerHTML = html;
+    }
+    
+    if (window.toggleUserPermissionsGrid) window.toggleUserPermissionsGrid();
+    
     openEditUserModal();
 }
 
@@ -244,8 +272,14 @@ export async function saveEditUser() {
     u.name = document.getElementById('editUserName').value.trim();
     u.role = document.getElementById('editUserAdmin').checked ? 'admin' : 'user';
 
+    // Zbieramy zaznaczone uprawnienia do zakładek
+    const checkboxes = document.querySelectorAll('.edit-user-tab-cb');
+    if (checkboxes.length > 0) {
+        u.allowedTabs = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+    }
+
     renderUsersTable();
-    autoSaveToDisk();
+    autoSaveToDisk(true);
     closeEditUserModal();
     await customAlert("Zapisano zmiany użytkownika.");
 }
@@ -262,7 +296,10 @@ export async function addNewUser() {
         return;
     }
 
-    const newUsers = [...usersList, { login, name, role: isAdmin ? 'admin' : 'user', allowedTabs: [] }];
+    const allTabs = AVAILABLE_TABS.map(t => t.id);
+    allTabs.push('users');
+
+    const newUsers = [...usersList, { login, name, role: isAdmin ? 'admin' : 'user', allowedTabs: allTabs, preferredTabs: allTabs }];
     setUsersList(newUsers);
 
     document.getElementById('formNewUserLogin').value = '';
@@ -270,7 +307,7 @@ export async function addNewUser() {
     document.getElementById('formNewUserAdmin').checked = false;
 
     renderUsersTable();
-    autoSaveToDisk();
+    autoSaveToDisk(true);
     await customAlert("Dodano użytkownika do listy uprawnień.");
 }
 
@@ -285,20 +322,66 @@ export async function resetProtocolCounter() {
     }
 }
 
+export function toggleUserPermissionsGrid() {
+    const adminCb = document.getElementById('editUserAdmin');
+    const container = document.getElementById('editUserPermissionsContainer');
+    if (adminCb && container) {
+        if (adminCb.checked) {
+            container.style.opacity = '0.5';
+            container.style.pointerEvents = 'none';
+        } else {
+            container.style.opacity = '1';
+            container.style.pointerEvents = 'auto';
+        }
+    }
+}
+
 // ==========================================
 // 4. OBSŁUGA MODALI DIALOGOWYCH W UI
 // ==========================================
 
-export function openNotificationsModal() { const m = document.getElementById('notificationsModal'); if (m) { m.classList.remove('hidden'); m.classList.add('flex'); } }
+export function openNotificationsModal() { 
+    const m = document.getElementById('notificationsModal'); 
+    if (m) { 
+        m.classList.remove('hidden'); 
+        m.classList.add('flex'); 
+        if (window.renderNotificationsList) window.renderNotificationsList();
+    } 
+}
 export function closeNotificationsModal() { const m = document.getElementById('notificationsModal'); if (m) { m.classList.add('hidden'); m.classList.remove('flex'); } }
 
-export function openInduscoRequestModal() { const m = document.getElementById('induscoRequestModal'); if (m) { m.classList.remove('hidden'); m.classList.add('flex'); } }
+export function openInduscoRequestModal() { 
+    const select = document.getElementById('induscoRequestPaint');
+    if (select && window.getAllPossibleDailyPaints) {
+        const paints = window.getAllPossibleDailyPaints();
+        select.innerHTML = paints.map(p => `<option value="${escapeHTML(p)}">${escapeHTML(p)}</option>`).join('');
+    }
+    const m = document.getElementById('induscoRequestModal'); 
+    if (m) { 
+        m.classList.remove('hidden'); 
+        m.classList.add('flex'); 
+    } 
+}
 export function closeInduscoRequestModal() { const m = document.getElementById('induscoRequestModal'); if (m) { m.classList.add('hidden'); m.classList.remove('flex'); } }
 
-export function openMonthlyReportModal() { const m = document.getElementById('monthlyReportModal'); if (m) { m.classList.remove('hidden'); m.classList.add('flex'); } }
+export function openMonthlyReportModal() { 
+    const m = document.getElementById('monthlyReportModal'); 
+    if (m) { 
+        m.classList.remove('hidden'); 
+        m.classList.add('flex'); 
+        if(window.renderMonthlyReport) window.renderMonthlyReport();
+    } 
+}
 export function closeMonthlyReportModal() { const m = document.getElementById('monthlyReportModal'); if (m) { m.classList.add('hidden'); m.classList.remove('flex'); } }
 
-export function openPaintReportModal() { const m = document.getElementById('paintReportModal'); if (m) { m.classList.remove('hidden'); m.classList.add('flex'); } }
+export function openPaintReportModal() { 
+    const m = document.getElementById('paintReportModal'); 
+    if (m) { 
+        m.classList.remove('hidden'); 
+        m.classList.add('flex'); 
+        if(window.renderPaintReport) window.renderPaintReport();
+    } 
+}
 export function closePaintReportModal() { const m = document.getElementById('paintReportModal'); if (m) { m.classList.add('hidden'); m.classList.remove('flex'); } }
 
 export function openEditInduscoModal() { const m = document.getElementById('editInduscoModal'); if (m) { m.classList.remove('hidden'); m.classList.add('flex'); } }
@@ -328,6 +411,7 @@ window.editUser = editUser;
 window.saveEditUser = saveEditUser;
 window.addNewUser = addNewUser;
 window.resetProtocolCounter = resetProtocolCounter;
+window.toggleUserPermissionsGrid = toggleUserPermissionsGrid;
 
 window.openNotificationsModal = openNotificationsModal;
 window.closeNotificationsModal = closeNotificationsModal;

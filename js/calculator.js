@@ -3,8 +3,7 @@
 import { shopPrimerRules, steelGradesList } from './config.js';
 import { formatNumber, escapeHTML } from './utils.js';
 import {
-    database, inputData, resultsData, paintTypes, laborCosts,
-    isPreviewMode, visibleDailyPaints,
+    database, inputData, resultsData, paintTypes, laborCosts, visibleDailyPaints,
     setResultsData, setInputData, autoSaveToDisk
 } from './store.js';
 
@@ -220,6 +219,13 @@ export function renderColorsTable() {
 
 export function renderPaintTypesTable() {
     const tbody = document.getElementById('paintTypesTableBody');
+    
+    // AKTUALIZACJA PÓŁ KOSZTÓW W WIDOKU
+    const inputCostBlachy = document.getElementById('costBlachy');
+    const inputCostProfile = document.getElementById('costProfile');
+    if (inputCostBlachy) inputCostBlachy.value = laborCosts.blachy || 4.20;
+    if (inputCostProfile) inputCostProfile.value = laborCosts.profile || 6.80;
+
     if(!tbody) return;
     
     let html = '';
@@ -311,8 +317,7 @@ export async function removePaintType(id) {
             }
         });
         
-        // Zastępujemy tablicę bezpiecznie za pomocą settera ze store.js
-        window.setPaintTypes ? window.setPaintTypes(newTypes) : paintTypes.length = 0; // fallback
+        window.setPaintTypes ? window.setPaintTypes(newTypes) : paintTypes.length = 0; 
         if (!window.setPaintTypes) newTypes.forEach(t => paintTypes.push(t));
 
         renderPaintTypesTable(); updatePaintDropdowns(); calculateCosts();
@@ -479,7 +484,7 @@ export function clearAddForm() {
 export async function clearInputData() {
     if(await window.customConfirm("Czy na pewno chcesz wyczyścić listę elementów?")) {
         if (window.cancelEditMode) window.cancelEditMode();
-        setInputData([]); // Poprawne czyszczenie tablicy ze store.js
+        setInputData([]);
         document.getElementById('protocolDateInput').valueAsDate = new Date(); 
         window.historicalRates = null;
         calculate();
@@ -488,6 +493,9 @@ export async function clearInputData() {
 }
 
 export function removeInputItem(index) {
+    const isPreviewActive = window.isPreviewMode || (document.getElementById('previewBanner') && !document.getElementById('previewBanner').classList.contains('hidden'));
+    if(isPreviewActive) return;
+    
     inputData.splice(index, 1); calculate();
     if (inputData.length === 0) {
         document.getElementById('resultsSection').classList.add('hidden'); document.getElementById('resultsSection').classList.remove('flex');
@@ -495,6 +503,9 @@ export function removeInputItem(index) {
 }
 
 export function updateArea(index, value) {
+    const isPreviewActive = window.isPreviewMode || (document.getElementById('previewBanner') && !document.getElementById('previewBanner').classList.contains('hidden'));
+    if(isPreviewActive) return;
+    
     if (value === null || value === undefined || value.toString().trim() === "") inputData[index].manualArea = null; 
     else {
         const num = parseFloat(value.toString().replace(/[\s\u00A0]/g, '').replace(',', '.'));
@@ -504,10 +515,16 @@ export function updateArea(index, value) {
 }
 
 export function updateUnit(index, value) {
+    const isPreviewActive = window.isPreviewMode || (document.getElementById('previewBanner') && !document.getElementById('previewBanner').classList.contains('hidden'));
+    if(isPreviewActive) return;
+    
     if (value && value.trim() !== "") { inputData[index].Jednostka = value.trim().toUpperCase(); calculate(); }
 }
 
 export function updateRowData(index, field, value) {
+    const isPreviewActive = window.isPreviewMode || (document.getElementById('previewBanner') && !document.getElementById('previewBanner').classList.contains('hidden'));
+    if(isPreviewActive) return;
+    
     const safeValue = value || "";
     if (field === 'Farba' || field === 'Gatunek') inputData[index][field] = safeValue.toString().toUpperCase();
     else if (field === 'Ilosc') inputData[index][field] = parseInt(value) || 1;
@@ -526,6 +543,7 @@ export function calculate() {
     if (window.updatePrintHeaders) window.updatePrintHeaders();
 
     const currentPaintTypes = window.historicalRates ? window.historicalRates.paintTypes : paintTypes;
+    const isPreviewActive = window.isPreviewMode || (document.getElementById('previewBanner') && !document.getElementById('previewBanner').classList.contains('hidden'));
 
     inputData.forEach((row, index) => {
         let farba = row.Farba || "Nie wybrano";
@@ -579,12 +597,17 @@ export function calculate() {
     
     const btnSave = document.getElementById('btnSaveToSummary');
     if (btnSave) {
-        if (window.editingProtocolId) {
-            btnSave.className = "bg-blue-600 text-white border border-black hover:bg-blue-800 px-6 py-2 text-sm font-bold transition flex items-center gap-1.5 uppercase shadow-md";
-        } else if (inputData.length > 0 && !isPreviewMode) {
-            btnSave.className = "bg-green-600 text-white border border-black hover:bg-green-700 px-6 py-2 text-sm font-bold transition flex items-center gap-1.5 uppercase shadow-md";
+        if (isPreviewActive) {
+            btnSave.style.display = 'none';
         } else {
-            btnSave.className = "bg-black text-white border border-black hover:bg-gray-800 px-6 py-2 text-sm font-bold transition flex items-center gap-1.5 uppercase shadow-md";
+            btnSave.style.display = 'flex';
+            if (window.editingProtocolId) {
+                btnSave.className = "bg-blue-600 text-white border border-black hover:bg-blue-800 px-6 py-2 text-sm font-bold transition flex items-center gap-1.5 uppercase shadow-md";
+            } else if (inputData.length > 0) {
+                btnSave.className = "bg-green-600 text-white border border-black hover:bg-green-700 px-6 py-2 text-sm font-bold transition flex items-center gap-1.5 uppercase shadow-md";
+            } else {
+                btnSave.className = "bg-black text-white border border-black hover:bg-gray-800 px-6 py-2 text-sm font-bold transition flex items-center gap-1.5 uppercase shadow-md";
+            }
         }
     }
     
@@ -670,51 +693,79 @@ export function renderTable() {
     const tbody = document.getElementById('resultsTableBody');
     const paintOptionsHtml = paintTypes.map(pt => `<option value="${pt.id}">${escapeHTML(pt.name)}</option>`).join('');
 
+    const isPreviewActive = window.isPreviewMode || (document.getElementById('previewBanner') && !document.getElementById('previewBanner').classList.contains('hidden'));
+
+    const clearBtn = document.querySelector('button[onclick="clearInputData()"]');
+    if (clearBtn) clearBtn.style.display = isPreviewActive ? 'none' : 'inline-block';
+    
+    const dateInput = document.getElementById('protocolDateInput');
+    if (dateInput) dateInput.disabled = isPreviewActive;
+
     let html = '';
     resultsData.forEach(row => {
-        const deleteBtnHtml = isPreviewMode ? '' : `<button onclick="removeInputItem(${row.originalIndex})" class="text-black font-bold uppercase text-xs border border-black px-1 hover:bg-black hover:text-white" title="Usuń pozycję">X</button>`;
-        const editInputAttr = isPreviewMode ? 'disabled' : '';
-        const editInputClass = isPreviewMode ? 'w-full min-w-[30px] bg-gray-200 border-none outline-none text-right font-bold text-black px-1 py-0.5' : `w-full min-w-[30px] bg-transparent hover:bg-gray-200 focus:bg-gray-200 border border-transparent hover:border-black focus:border-black outline-none text-right font-bold ${row.isManual ? 'text-blue-600' : 'text-black'} px-1 py-0.5 transition-all`;
-        const unitInputClass = isPreviewMode ? 'w-full min-w-[50px] bg-transparent border-none outline-none font-bold text-black uppercase px-1 py-0.5' : 'w-full min-w-[50px] bg-transparent hover:bg-gray-200 border border-transparent focus:bg-white focus:border-black outline-none font-bold text-black uppercase px-1 py-0.5 transition-all';
-        const farbaCell = isPreviewMode ? `<span class="text-[10px] font-bold text-black">${escapeHTML(row.farba)}</span>` : `<select onchange="updateRowData(${row.originalIndex}, 'Farba', this.value)" class="w-full min-w-[60px] bg-transparent border border-transparent hover:border-black focus:border-black outline-none font-bold text-[10px] text-black transition-all">${paintOptionsHtml}</select>`;
+        const deleteBtnHtml = isPreviewActive ? '' : `<button onclick="removeInputItem(${row.originalIndex})" class="text-black font-bold uppercase text-xs border border-black px-1 hover:bg-black hover:text-white" title="Usuń pozycję">X</button>`;
+        
+        const editInputAttr = isPreviewActive ? 'disabled' : '';
+        const editInputClass = isPreviewActive ? 'w-full min-w-[30px] bg-transparent border-none outline-none text-right font-bold text-black px-1 py-0.5 cursor-not-allowed' : `w-full min-w-[30px] bg-transparent hover:bg-gray-200 focus:bg-gray-200 border border-transparent hover:border-black focus:border-black outline-none text-right font-bold ${row.isManual ? 'text-blue-600' : 'text-black'} px-1 py-0.5 transition-all`;
+        
+        const unitInputClass = isPreviewActive ? 'w-full min-w-[50px] bg-transparent border-none outline-none font-bold text-black uppercase px-1 py-0.5 cursor-not-allowed' : 'w-full min-w-[50px] bg-transparent hover:bg-gray-200 border border-transparent focus:bg-white focus:border-black outline-none font-bold text-black uppercase px-1 py-0.5 transition-all';
+        
+        const farbaCell = isPreviewActive ? `<span class="text-[10px] font-bold text-black uppercase block py-1">${escapeHTML(row.farba)}</span>` : `<select onchange="updateRowData(${row.originalIndex}, 'Farba', this.value)" class="w-full min-w-[60px] bg-transparent border border-transparent hover:border-black focus:border-black outline-none font-bold text-[10px] text-black transition-all">${paintOptionsHtml}</select>`;
         
         const typOptions = ["Blacha", "Profile HP", "Kątowniki L", "Płaskowniki FB", "Ceowniki UNP", "Teowniki T", "Profile IPE", "Profile HEB-HEA", "Profile półokrągłe HR", "Rury kwadratowe RHS", "Rury", "Pręty okrągłe (Ø)"];
         let typOptionsHtml = typOptions.map(t => `<option value="${t}" ${row.typ === t ? 'selected' : ''}>${t}</option>`).join('');
-        const typCell = isPreviewMode ? row.typ : `<select onchange="updateRowData(${row.originalIndex}, 'Typ', this.value)" class="w-full min-w-[60px] bg-transparent border border-transparent hover:border-black focus:border-black outline-none font-bold text-[10px] text-black uppercase transition-all">${typOptionsHtml}</select>`;
-        const gatunekCell = isPreviewMode ? escapeHTML(row.gatunek) : `<input type="text" value="${escapeHTML(row.gatunek)}" onchange="updateRowData(${row.originalIndex}, 'Gatunek', this.value)" list="dl-gatunki" class="w-full min-w-[30px] bg-transparent hover:bg-gray-200 focus:bg-white border border-transparent hover:border-black focus:border-black outline-none font-bold text-black px-1 py-0.5 transition-all">`;
+        const typCell = isPreviewActive ? `<span class="text-[10px] font-bold text-black uppercase block py-1">${escapeHTML(row.typ)}</span>` : `<select onchange="updateRowData(${row.originalIndex}, 'Typ', this.value)" class="w-full min-w-[60px] bg-transparent border border-transparent hover:border-black focus:border-black outline-none font-bold text-[10px] text-black uppercase transition-all">${typOptionsHtml}</select>`;
+        
+        const gatunekCell = isPreviewActive ? `<span class="text-[11px] font-bold text-black block text-center py-1">${escapeHTML(row.gatunek)}</span>` : `<input type="text" value="${escapeHTML(row.gatunek)}" onchange="updateRowData(${row.originalIndex}, 'Gatunek', this.value)" list="dl-gatunki" class="w-full min-w-[30px] bg-transparent hover:bg-gray-200 focus:bg-white border border-transparent hover:border-black focus:border-black outline-none font-bold text-black px-1 py-0.5 transition-all">`;
+        
         const gruboscVal = row.grubosc !== '-' ? row.grubosc : '';
-        const gruboscCell = isPreviewMode ? (typeof row.grubosc === 'number' ? formatNumber(row.grubosc, 1) : row.grubosc) : `<input type="number" step="0.1" value="${gruboscVal}" onchange="updateRowData(${row.originalIndex}, 'Grubosc', this.value)" class="w-full min-w-[30px] text-right bg-transparent hover:bg-gray-200 focus:bg-white border border-transparent hover:border-black focus:border-black outline-none text-black font-bold px-1 py-0.5 transition-all">`;
+        const gruboscCell = isPreviewActive ? `<span class="text-[11px] font-bold text-black block text-right py-1">${typeof row.grubosc === 'number' ? formatNumber(row.grubosc, 1) : row.grubosc}</span>` : `<input type="number" step="0.1" value="${gruboscVal}" onchange="updateRowData(${row.originalIndex}, 'Grubosc', this.value)" class="w-full min-w-[30px] text-right bg-transparent hover:bg-gray-200 focus:bg-white border border-transparent hover:border-black focus:border-black outline-none text-black font-bold px-1 py-0.5 transition-all">`;
+        
         const nazwaVal = row.nazwa !== '-' ? row.nazwa : '';
-        const nazwaCell = isPreviewMode ? escapeHTML(row.nazwa) : `<input type="text" value="${escapeHTML(row.nazwa)}" onchange="updateRowData(${row.originalIndex}, 'Nazwa', this.value)" list="dl-profile" class="w-full min-w-[40px] bg-transparent hover:bg-gray-200 focus:bg-white border border-transparent hover:border-black focus:border-black outline-none font-bold text-black px-1 py-0.5 transition-all">`;
+        const nazwaCell = isPreviewActive ? `<span class="text-[11px] font-bold text-black block py-1">${escapeHTML(row.nazwa)}</span>` : `<input type="text" value="${escapeHTML(row.nazwa)}" onchange="updateRowData(${row.originalIndex}, 'Nazwa', this.value)" list="dl-profile" class="w-full min-w-[40px] bg-transparent hover:bg-gray-200 focus:bg-white border border-transparent hover:border-black focus:border-black outline-none font-bold text-black px-1 py-0.5 transition-all">`;
+        
         const szerokoscVal = row.szerokosc !== '-' ? row.szerokosc : '';
-        const szerokoscCell = isPreviewMode ? (typeof row.szerokosc === 'number' ? formatNumber(row.szerokosc, 0) : row.szerokosc) : `<input type="number" step="1" value="${szerokoscVal}" onchange="updateRowData(${row.originalIndex}, 'Szerokosc', this.value)" class="w-full min-w-[30px] text-center bg-transparent hover:bg-gray-200 focus:bg-white border border-transparent hover:border-black focus:border-black outline-none text-black px-1 py-0.5 transition-all">`;
+        const szerokoscCell = isPreviewActive ? `<span class="text-[11px] font-normal text-black block text-center py-1">${typeof row.szerokosc === 'number' ? formatNumber(row.szerokosc, 0) : row.szerokosc}</span>` : `<input type="number" step="1" value="${szerokoscVal}" onchange="updateRowData(${row.originalIndex}, 'Szerokosc', this.value)" class="w-full min-w-[30px] text-center bg-transparent hover:bg-gray-200 focus:bg-white border border-transparent hover:border-black focus:border-black outline-none text-black px-1 py-0.5 transition-all">`;
+        
         const dlugoscVal = row.dlugosc !== '-' ? row.dlugosc : '';
-        const dlugoscCell = isPreviewMode ? (typeof row.dlugosc === 'number' ? formatNumber(row.dlugosc, 0) : row.dlugosc) : `<input type="number" step="1" value="${dlugoscVal}" onchange="updateRowData(${row.originalIndex}, 'Dlugosc', this.value)" class="w-full min-w-[30px] text-center bg-transparent hover:bg-gray-200 focus:bg-white border border-transparent hover:border-black focus:border-black outline-none text-black px-1 py-0.5 transition-all">`;
-        const iloscCell = isPreviewMode ? formatNumber(row.ilosc, 0) : `<input type="number" step="1" value="${row.ilosc}" onchange="updateRowData(${row.originalIndex}, 'Ilosc', this.value)" class="w-full min-w-[30px] text-center bg-transparent hover:bg-gray-200 focus:bg-white border border-transparent hover:border-black focus:border-black outline-none font-bold text-black px-1 py-0.5 transition-all">`;
+        const dlugoscCell = isPreviewActive ? `<span class="text-[11px] font-normal text-black block text-center py-1">${typeof row.dlugosc === 'number' ? formatNumber(row.dlugosc, 0) : row.dlugosc}</span>` : `<input type="number" step="1" value="${dlugoscVal}" onchange="updateRowData(${row.originalIndex}, 'Dlugosc', this.value)" class="w-full min-w-[30px] text-center bg-transparent hover:bg-gray-200 focus:bg-white border border-transparent hover:border-black focus:border-black outline-none text-black px-1 py-0.5 transition-all">`;
+        
+        const iloscCell = isPreviewActive ? `<span class="text-[11px] font-bold text-black block text-center py-1">${formatNumber(row.ilosc, 0)}</span>` : `<input type="number" step="1" value="${row.ilosc}" onchange="updateRowData(${row.originalIndex}, 'Ilosc', this.value)" class="w-full min-w-[30px] text-center bg-transparent hover:bg-gray-200 focus:bg-white border border-transparent hover:border-black focus:border-black outline-none font-bold text-black px-1 py-0.5 transition-all">`;
 
         html += `
             <tr class="hover:bg-gray-100 transition-colors border-b border-black">
                 <td class="px-1 py-1 border-r border-black text-black">${row.lp}</td>
                 <td class="px-1 py-1 border-r border-black font-bold text-black uppercase"><input type="text" ${editInputAttr} value="${escapeHTML(row.jednostka)}" onchange="updateUnit(${row.originalIndex}, this.value)" class="${unitInputClass}" title="Zmień projekt" list="dl-projects"></td>
-                <td class="px-1 py-1 border-r border-black">${farbaCell}</td>
-                <td class="px-1 py-1 border-r border-black text-black uppercase">${typCell}</td>
+                <td class="px-1 py-1 border-r border-black align-middle">${farbaCell}</td>
+                <td class="px-1 py-1 border-r border-black text-black uppercase align-middle">${typCell}</td>
                 <td class="px-1 py-1 border-r border-black font-bold text-black">${gatunekCell}</td>
                 <td class="px-1 py-1 border-r border-black text-right text-black font-bold">${gruboscCell}</td>
                 <td class="px-1 py-1 border-r border-black font-bold text-black">${nazwaCell}</td>
                 <td class="px-1 py-1 border-r border-black text-center text-black">${szerokoscCell}</td>
                 <td class="px-1 py-1 border-r border-black text-center text-black">${dlugoscCell}</td>
                 <td class="px-1 py-1 border-r border-black text-center font-bold">${iloscCell}</td>
-                <td class="px-1 py-1 border-r border-black text-right text-black">${row.mnoznik}</td>
+                <td class="px-1 py-1 border-r border-black text-right text-black align-middle">${row.mnoznik}</td>
                 <td class="px-1 py-1 border-r border-black text-right font-bold bg-white"><input type="text" ${editInputAttr} value="${row.powierzchnia > 0 || row.isManual ? formatNumber(row.powierzchnia, 2) : ''}" onchange="updateArea(${row.originalIndex}, this.value)" class="${editInputClass}" title="Edytuj pow."></td>
                 <td class="px-1 py-1 border-r border-black"><div class="flex items-center gap-1" title="${row.kolorInfo.name}"><span class="w-2.5 h-2.5 shrink-0 border border-black block" style="background-color: ${row.kolorInfo.hex}"></span><span class="text-[9px] font-bold text-black uppercase truncate max-w-[50px]">${row.kolorInfo.name}</span></div></td>
-                <td class="px-1 py-1 text-center print-hide action-col">${deleteBtnHtml}</td>
+                <td class="px-1 py-1 text-center print-hide action-col align-middle">${deleteBtnHtml}</td>
             </tr>
         `;
     });
     if (tbody) tbody.innerHTML = html;
     
-    resultsData.forEach(row => { if (!isPreviewMode && tbody) { const sel = tbody.children[row.originalIndex]?.querySelector('select'); if(sel) sel.value = row.farba; } });
-    document.querySelectorAll('.action-col').forEach(el => { if(isPreviewMode) el.classList.add('hidden'); else el.classList.remove('hidden'); });
+    resultsData.forEach(row => { 
+        if (!isPreviewActive && tbody) { 
+            const selFarba = tbody.children[row.originalIndex]?.querySelectorAll('select')[0];
+            const selTyp = tbody.children[row.originalIndex]?.querySelectorAll('select')[1];
+            if(selFarba) selFarba.value = row.farba; 
+            if(selTyp) selTyp.value = row.typ;
+        } 
+    });
+    
+    document.querySelectorAll('.action-col').forEach(el => { 
+        if(isPreviewActive) el.classList.add('hidden'); 
+        else el.classList.remove('hidden'); 
+    });
 }
 
 // ==========================================

@@ -1,7 +1,7 @@
 // --- MODUŁ ZARZĄDZANIA STANEM I BAZĄ DANYCH (STORE.JS) ---
 
 import { USE_FIREBASE } from './config.js';
-import { firebaseDb, dbRef, dbSet, dbGet, appUsers, } from './auth.js';
+import { firebaseDb, dbRef, dbSet, dbGet, appUsers } from './auth.js';
 import { parsePlDateToISO, formatISOToPL, parsePlDate } from './utils.js';
 
 // --- STANY GLOBALNE APLIKACJI ---
@@ -35,6 +35,10 @@ export let paintTypes = [
     { id: 'SIGMAWELD', name: 'SIGMAWELD', yieldBlachy: 10.0, yieldProfile: 6.5, thinnerPct: 14, fallbacks: {} }
 ];
 export let laborCosts = { blachy: 4.20, profile: 6.80 };
+// Zmienna userPreferences potrzebna dla setUserPreferences
+export let userPreferences = null;
+// Eksport usersList (odwołanie do appUsers z auth.js)
+export const usersList = appUsers;
 
 window.hasUnsavedChanges = false;
 window.isSyncing = false;
@@ -55,11 +59,18 @@ export function setDatabase(db) { database = db; }
 export function setPaintTypes(types) { paintTypes = types; }
 export function setLaborCosts(costs) { laborCosts = costs; }
 export function setVisibleDailyPaints(val) { visibleDailyPaints = val; }
+export function setUserPreferences(val) { userPreferences = val; }
+export function setUsersList(list) {
+    if (appUsers && typeof appUsers.push === 'function') {
+        appUsers.length = 0; 
+        appUsers.push(...list);
+    }
+}
 
 export function getProjectState() {
     return {
         isMm: true,
-        appUsers: appUsers,
+        appUsers: usersList, // Poprawiono z appUsers na usersList, aby pobierać aktualną listę użytkowników
         projectsList: projectsList,
         archivedProjectsList: archivedProjectsList,
         database: database,
@@ -191,12 +202,21 @@ export async function applyProjectData(jsonString, isSilent = false) {
             laborCosts = projectData.laborCosts || { blachy: 4.20, profile: 6.80 };
         }
 
+        // Wczytywanie listy użytkowników z zapisu
+        if (projectData.appUsers) {
+            setUsersList(projectData.appUsers);
+        }
+
         if (window.renderDbTable) window.renderDbTable();
         if (window.renderPaintTypesTable) window.renderPaintTypesTable();
         if (window.updatePaintDropdowns) window.updatePaintDropdowns();
         if (window.renderHistoryTable) window.renderHistoryTable();
         if (window.renderProjectsList) window.renderProjectsList();
         if (window.renderInduscoTable) window.renderInduscoTable();
+
+        // Wymuszenie renderowania widoku ustawień po wczytaniu
+        if (window.renderUsersTable) window.renderUsersTable();
+        if (window.renderUserPreferences) window.renderUserPreferences();
 
         const initialOverlay = document.getElementById('initialLoadOverlay');
         if (initialOverlay) { initialOverlay.classList.add('hidden'); initialOverlay.classList.remove('flex'); }
@@ -211,16 +231,16 @@ export async function loadDataFromFirebase() {
     try {
         if (!firebaseDb || !dbGet || !dbRef) return;
         
-        // Najpierw szukamy w nowej strukturze
+        // Szukanie w nowej strukturze
         const snapshot = await dbGet(dbRef(firebaseDb, 'appState'));
         if (snapshot.exists()) {
             await applyProjectData(JSON.stringify(snapshot.val()), true);
         } else {
-            // SPADOCHRON: Szukamy w starej strukturze głównej (wsteczna kompatybilność)
+            // Szukanie w starej strukturze głównej (wsteczna kompatybilność)
             const oldSnapshot = await dbGet(dbRef(firebaseDb, '/'));
             if (oldSnapshot.exists() && oldSnapshot.val() && oldSnapshot.val().projectsList) {
                 await applyProjectData(JSON.stringify(oldSnapshot.val()), true);
-                autoSaveToDisk(true); // Automatycznie migruje stare dane do nowej struktury 'appState'
+                autoSaveToDisk(true); 
             }
         }
     } catch (err) {

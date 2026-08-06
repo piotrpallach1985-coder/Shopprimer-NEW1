@@ -7,13 +7,47 @@ let chartM2Instance = null;
 let chartZuzInstance = null;
 
 // ==========================================
+// FUNKCJA POMOCNICZA: GENEROWANIE MIESIĘCY
+// ==========================================
+function populateMonthOptions(selectElement) {
+    if (!selectElement) return;
+    
+    const monthsSet = new Set();
+    const today = new Date();
+    monthsSet.add(`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`);
+    
+    printHistory.forEach(h => {
+        if (!h.isError && h.date) {
+            const d = parsePlDate(h.date);
+            if (!isNaN(d.getTime())) {
+                monthsSet.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+            }
+        }
+    });
+
+    const sortedMonths = Array.from(monthsSet).sort().reverse();
+    
+    if (selectElement.options.length === 0) {
+        selectElement.innerHTML = sortedMonths.map(m => {
+            const [y, mo] = m.split('-');
+            return `<option value="${m}">${mo}.${y}</option>`;
+        }).join('');
+        selectElement.value = sortedMonths[0]; 
+    }
+}
+
+// ==========================================
 // 1. RAPORT MIESIĘCZNY (M2 I KOSZTY)
 // ==========================================
 
 export function renderMonthlyReport() {
     const tbody = document.getElementById('monthlyReportTableBody');
     const tfoot = document.getElementById('monthlyReportTableFoot');
-    const monthVal = document.getElementById('reportMonthSelector') ? document.getElementById('reportMonthSelector').value : null;
+    const monthInput = document.getElementById('reportMonthSelector');
+    
+    if (monthInput) populateMonthOptions(monthInput);
+
+    const monthVal = monthInput ? monthInput.value : null;
     const printDateSpan = document.querySelector('.print-date-report');
     
     if (!tbody || !tfoot || !monthVal) return;
@@ -57,12 +91,12 @@ export function renderMonthlyReport() {
         const data = units[u];
         const safeU = escapeHTML(u);
         html += `
-            <tr class="hover:bg-gray-50 transition-colors">
-                <td class="px-3 py-2 border-r border-b border-black font-bold text-black">${safeU}</td>
-                <td class="px-3 py-2 border-r border-b border-black text-right text-black">${formatNumber(data.blachy, 2)}</td>
-                <td class="px-3 py-2 border-r border-b border-black text-right text-black">${formatNumber(data.profile, 2)}</td>
-                <td class="px-3 py-2 border-r border-b border-black text-right font-bold text-blue-700">${formatNumber(data.area, 2)}</td>
-                <td class="px-3 py-2 border-b border-black text-right font-bold text-green-700">${formatNumber(data.cost, 2)}</td>
+            <tr class="hover:bg-gray-50 transition-colors border-b border-black">
+                <td class="px-3 py-2 border-r border-black font-bold text-black">${safeU}</td>
+                <td class="px-3 py-2 border-r border-black text-right text-black">${formatNumber(data.blachy, 2)}</td>
+                <td class="px-3 py-2 border-r border-black text-right text-black">${formatNumber(data.profile, 2)}</td>
+                <td class="px-3 py-2 border-r border-black text-right font-bold text-blue-700">${formatNumber(data.area, 2)}</td>
+                <td class="px-3 py-2 text-right font-bold text-green-700">${formatNumber(data.cost, 2)}</td>
             </tr>
         `;
     });
@@ -86,7 +120,11 @@ export function renderMonthlyReport() {
 export function renderPaintReport() {
     const tbody = document.getElementById('paintReportTableBody');
     const tfoot = document.getElementById('paintReportTableFoot');
-    const monthVal = document.getElementById('reportPaintMonthSelector') ? document.getElementById('reportPaintMonthSelector').value : null;
+    const monthInput = document.getElementById('reportPaintMonthSelector');
+    
+    if (monthInput) populateMonthOptions(monthInput);
+
+    const monthVal = monthInput ? monthInput.value : null;
     const printDateSpan = document.querySelector('.print-date-paint-report');
     
     if (!tbody || !tfoot || !monthVal) return;
@@ -155,13 +193,13 @@ export function renderPaintReport() {
             }
 
             html += `
-                <tr class="hover:bg-gray-50 transition-colors">
+                <tr class="hover:bg-gray-50 transition-colors border-b border-black">
                     ${unitCellHtml}
-                    <td class="px-3 py-2 border-r border-b border-black font-bold text-black">${paintId}</td>
-                    <td class="px-3 py-2 border-r border-b border-black text-right text-blue-700 font-bold">${formatNumber(data.paint, 2)}</td>
-                    <td class="px-3 py-2 border-r border-b border-black text-right text-yellow-600 font-bold">${formatNumber(data.thinner, 2)}</td>
-                    <td class="px-3 py-2 border-r border-b border-black text-right text-purple-700 font-bold">${formatNumber(percent, 1)}%</td>
-                    <td class="px-3 py-2 border-b border-black text-right font-bold text-green-700">${formatNumber(data.paint + data.thinner, 2)}</td>
+                    <td class="px-3 py-2 border-r border-black font-bold text-black">${paintId}</td>
+                    <td class="px-3 py-2 border-r border-black text-right text-blue-700 font-bold">${formatNumber(data.paint, 2)}</td>
+                    <td class="px-3 py-2 border-r border-black text-right text-yellow-600 font-bold">${formatNumber(data.thinner, 2)}</td>
+                    <td class="px-3 py-2 border-r border-black text-right text-purple-700 font-bold">${formatNumber(percent, 1)}%</td>
+                    <td class="px-3 py-2 text-right font-bold text-green-700">${formatNumber(data.paint + data.thinner, 2)}</td>
                 </tr>
             `;
         });
@@ -209,6 +247,11 @@ export function setCompareMonth() {
     
     document.getElementById('compareDateFrom').value = firstDay;
     document.getElementById('compareDateTo').value = lastDay;
+    
+    // Zsynchronizowanie daty na wykresach z datą tabeli!
+    const chartMonthInput = document.getElementById('compareMonthDate');
+    if (chartMonthInput) chartMonthInput.value = monthVal;
+
     renderCompareTable();
 }
 
@@ -247,8 +290,33 @@ export function getBalancesForDate(targetDateIso) {
 }
 
 export function renderCompareTable() {
-    const dateFromIso = document.getElementById('compareDateFrom').value;
-    const dateToIso = document.getElementById('compareDateTo').value;
+    const dateFromInput = document.getElementById('compareDateFrom');
+    const dateToInput = document.getElementById('compareDateTo');
+    const monthInput = document.getElementById('compareTableMonth');
+    const chartMonthInput = document.getElementById('compareMonthDate');
+    
+    // Ustawienie POPRZEDNIEGO miesiąca domyślnie przy włączeniu okienka
+    if (dateFromInput && dateToInput && (!dateFromInput.value || !dateToInput.value)) {
+        const d = new Date();
+        d.setMonth(d.getMonth() - 1); // Cofamy o 1 miesiąc do tyłu
+        
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const defaultMonth = `${y}-${m}`;
+        
+        if (monthInput) monthInput.value = defaultMonth;
+        if (chartMonthInput) chartMonthInput.value = defaultMonth; // Synchronizacja
+        
+        const firstDay = `${y}-${m}-01`;
+        const lastDayObj = new Date(y, parseInt(m), 0);
+        const lastDay = `${y}-${m}-${String(lastDayObj.getDate()).padStart(2, '0')}`;
+        
+        dateFromInput.value = firstDay;
+        dateToInput.value = lastDay;
+    }
+
+    const dateFromIso = dateFromInput ? dateFromInput.value : null;
+    const dateToIso = dateToInput ? dateToInput.value : null;
     if (!dateFromIso || !dateToIso) return;
     
     const dFrom = new Date(dateFromIso); dFrom.setHours(0,0,0,0);
@@ -341,10 +409,27 @@ export function renderCompareTable() {
     
     html += `</tbody></table>`;
     document.getElementById('compareDailyResults').innerHTML = html;
+
+    // Automatyczne renderowanie wykresów po wygenerowaniu głównej tabeli!
+    if (window.renderMonthlyCompareCharts) window.renderMonthlyCompareCharts();
 }
 
 export function renderMonthlyCompareCharts() {
-    const monthVal = document.getElementById('compareMonthDate').value;
+    const monthInput = document.getElementById('compareMonthDate');
+    const tableMonthInput = document.getElementById('compareTableMonth');
+    
+    // Zawsze bierzemy datę z głównej tabeli porównawczej do wykresów
+    if (monthInput && tableMonthInput && tableMonthInput.value) {
+        monthInput.value = tableMonthInput.value;
+    } else if (monthInput && !monthInput.value) {
+        const d = new Date();
+        d.setMonth(d.getMonth() - 1);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        monthInput.value = `${y}-${m}`;
+    }
+
+    const monthVal = monthInput ? monthInput.value : null;
     if (!monthVal) return;
     
     const [year, month] = monthVal.split('-').map(Number);
@@ -392,7 +477,6 @@ export function renderMonthlyCompareCharts() {
         } 
     };
 
-    // Zabezpieczenie przed brakiem biblioteki Chart.js (jeśli się nie załadowała z CDN)
     if (typeof window.Chart === 'undefined') return;
 
     if (chartM2Instance) chartM2Instance.destroy();
@@ -428,6 +512,34 @@ export function renderMonthlyCompareCharts() {
     });
 }
 
+// ==========================================
+// 4. FUNKCJE DRUKOWANIA RAPORTÓW
+// ==========================================
+
+export function printMonthlyReport() {
+    const modal = document.getElementById('monthlyReportModal');
+    const main = document.getElementById('mainAppContainer');
+    if (modal && main) {
+        modal.classList.remove('print-hide');
+        main.classList.add('print-hide');
+        window.print();
+        modal.classList.add('print-hide');
+        main.classList.remove('print-hide');
+    }
+}
+
+export function printPaintReport() {
+    const modal = document.getElementById('paintReportModal');
+    const main = document.getElementById('mainAppContainer');
+    if (modal && main) {
+        modal.classList.remove('print-hide');
+        main.classList.add('print-hide');
+        window.print();
+        modal.classList.add('print-hide');
+        main.classList.remove('print-hide');
+    }
+}
+
 // Bindowanie do window
 window.renderMonthlyReport = renderMonthlyReport;
 window.renderPaintReport = renderPaintReport;
@@ -435,3 +547,5 @@ window.setCompareMonth = setCompareMonth;
 window.getBalancesForDate = getBalancesForDate;
 window.renderCompareTable = renderCompareTable;
 window.renderMonthlyCompareCharts = renderMonthlyCompareCharts;
+window.printMonthlyReport = printMonthlyReport;
+window.printPaintReport = printPaintReport;
