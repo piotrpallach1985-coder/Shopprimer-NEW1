@@ -369,10 +369,6 @@ export async function editHistoryItem(id, sourceTab = 'history') {
     if (window.calculate) window.calculate();
 }
 
-// =====================================
-// BRAKUJĄCE FUNKCJE ANULOWANIA EDYCJI 
-// =====================================
-
 export function cancelEditMode() {
     window.editingProtocolId = null;
     const btnCancel = document.getElementById('btnCancelEdit');
@@ -616,7 +612,7 @@ window.printHistoryProtocol = printHistoryProtocol;
 window.loadHistoryItem = loadHistoryItem;
 window.editHistoryItem = editHistoryItem;
 window.cancelEditMode = cancelEditMode;
-window.cancelEditProtocol = cancelEditProtocol; // Funkcja podpięta z powrotem
+window.cancelEditProtocol = cancelEditProtocol;
 window.exitPreviewMode = exitPreviewMode;
 window.acceptCurrentPreview = acceptCurrentPreview;
 window.rejectCurrentPreview = rejectCurrentPreview;
@@ -625,7 +621,18 @@ window.deleteSelectedHistoryItemsWithPin = deleteSelectedHistoryItemsWithPin;
 window.renderHistoryTable = renderHistoryTable;
 window.exportHistoryToExcel = exportHistoryToExcel;
 
-// Uzupełnienie zdarzenia nasłuchującego dla drukowania
+// Uzupełnienie zdarzenia nasłuchującego dla zamykania/odświeżania okna - Zabezpieczenie przed "wiszącymi" danymi
+window.addEventListener('beforeunload', () => {
+    if (window.editingProtocolId || window.isPreviewMode) {
+        if (window.tempInputData) {
+            setInputData(window.tempInputData);
+        } else {
+            setInputData([]);
+        }
+        if (window.autoSaveToDisk) window.autoSaveToDisk(true);
+    }
+});
+
 window.addEventListener('beforeprint', () => {
     const dateStr = new Date().toLocaleDateString('pl-PL');
     document.querySelectorAll('.print-history-only .print-date').forEach(el => el.textContent = dateStr);
