@@ -388,8 +388,15 @@
                             </button>
                             <h2 id="dailySelectedPaintTitle" class="text-lg font-bold text-blue-600 uppercase tracking-wider">WYBIERZ FARBĘ</h2>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <button onclick="openMonthlyReportModal()" class="border border-black px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase shadow-sm transition-colors">RAPORT MIESIĘCZNY (M2)</button>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <!-- DODANY WYBÓR MIESIĄCA DLA GŁÓWNEGO ROZLICZENIA DZIENNEGO -->
+                            <div class="flex items-center gap-1 mr-2">
+                                <label class="text-[10px] font-bold uppercase mr-1">Miesiąc:</label>
+                                <button onclick="changeDailyMonth(-1)" class="border border-black px-2 py-1 text-xs font-bold bg-white hover:bg-gray-200 transition">&lt;</button>
+                                <input type="month" id="dailyMonthInput" onchange="renderDailyLedger()" class="border border-black p-1 text-xs outline-none bg-white font-bold cursor-pointer hover:bg-gray-100">
+                                <button onclick="changeDailyMonth(1)" class="border border-black px-2 py-1 text-xs font-bold bg-white hover:bg-gray-200 transition">&gt;</button>
+                            </div>
+                            <button onclick="openMonthlyReportModal()" class="border border-black px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase shadow-sm transition-colors ml-2">RAPORT MIESIĘCZNY (M2)</button>
                             <button onclick="openPaintReportModal()" class="border border-black px-3 py-1 bg-green-600 hover:bg-green-700 text-white font-bold text-xs uppercase shadow-sm transition-colors ml-2">RAPORT FARB</button>
                             <button onclick="printDailyLedger()" class="bg-black text-white px-3 py-1 font-bold text-xs uppercase shadow-md hover:bg-gray-800 ml-2">DRUKUJ (PDF)</button>
                         </div>
@@ -398,16 +405,16 @@
                         <table class="w-full text-center text-[11px] md:text-xs whitespace-nowrap bg-white">
                             <thead class="bg-gray-100 text-black font-bold uppercase sticky top-0 border-b-2 border-black z-10">
                                 <tr>
-                                    <th class="px-2 py-1 border-r border-black">DATA</th>
-                                    <th class="px-2 py-1 border-r border-black">JEDNOSTKA</th>
-                                    <th class="px-2 py-1 border-r border-black text-green-700">WYDANIE [L]</th>
-                                    <th class="px-2 py-1 border-r border-black text-red-600">UTYLIZACJA [L]</th>
-                                    <th class="px-2 py-1 border-r border-black text-blue-700">ZUŻYCIE [L]</th>
-                                    <th class="px-2 py-1 border-r border-black bg-yellow-100">POZOSTAŁO [L]</th>
-                                    <th class="px-2 py-1 border-r border-black text-blue-700">ILOŚĆ M2</th>
-                                    <th class="px-2 py-1 border-r border-black">RODZAJ MATERIAŁU</th>
-                                    <th class="px-2 py-1 border-r border-black">KALKULACJA</th>
-                                    <th class="px-2 py-1 print-hide">AKCJE</th>
+                                    <th class="px-2 py-1 border-r border-black w-24">DATA</th>
+                                    <th class="px-2 py-1 border-r border-black w-32">JEDNOSTKA</th>
+                                    <th class="px-2 py-1 border-r border-black text-green-700 w-20">WYDANIE [L]</th>
+                                    <th class="px-2 py-1 border-r border-black text-red-600 w-20">UTYLIZACJA [L]</th>
+                                    <th class="px-2 py-1 border-r border-black text-blue-700 w-20">ZUŻYCIE [L]</th>
+                                    <th class="px-2 py-1 border-r border-black bg-yellow-100 w-20">POZOSTAŁO [L]</th>
+                                    <th class="px-2 py-1 border-r border-black text-blue-700 w-20">ILOŚĆ M2</th>
+                                    <th class="px-2 py-1 border-r border-black w-28">RODZAJ MATERIAŁU</th>
+                                    <th class="px-2 py-1 border-r border-black w-28">KALKULACJA</th>
+                                    <th class="px-2 py-1 print-hide w-16">AKCJE</th>
                                 </tr>
                             </thead>
                             <tbody id="dailyTableBody" class="divide-y divide-black bg-white"></tbody>
@@ -442,8 +449,8 @@
                             </button>
                             <h2 id="dailyInduscoSelectedPaintTitle" class="text-lg font-bold text-blue-600 uppercase tracking-wider">WYBIERZ FARBĘ</h2>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <div class="flex items-center gap-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <div class="flex items-center gap-1 mr-2">
                                 <label class="text-[10px] font-bold uppercase mr-1">Miesiąc:</label>
                                 <button onclick="changeInduscoMonth(-1)" class="border border-black px-2 py-1 text-xs font-bold bg-white hover:bg-gray-200 transition">&lt;</button>
                                 <input type="month" id="induscoDailyMonthInput" onchange="renderDailyInduscoLedger()" class="border border-black p-1 text-xs outline-none bg-white font-bold cursor-pointer hover:bg-gray-100">
