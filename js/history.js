@@ -186,7 +186,6 @@ export async function acceptCurrentPreview() {
     if (await window.customConfirm("Czy na pewno chcesz potwierdzić przyjęcie tej kalkulacji?")) {
         window.forceNextCloudOverwrite = true; 
         
-        // Tworzymy NOWĄ tablicę i NOWY obiekt by wymusić zrzut do bazy (niezbędne dla starych protokołów)
         const newHistory = [...printHistory];
         newHistory[index] = {
             ...newHistory[index],
@@ -221,7 +220,6 @@ export async function rejectCurrentPreview() {
     if (comment !== null && comment.trim() !== "") {
         window.forceNextCloudOverwrite = true; 
         
-        // Tworzymy NOWĄ tablicę i NOWY obiekt by wymusić zrzut do bazy (niezbędne dla starych protokołów)
         const newHistory = [...printHistory];
         newHistory[index] = {
             ...newHistory[index],
@@ -491,20 +489,9 @@ export function renderHistoryTable() {
     const historyToDisplay = [...filteredHistory].reverse();
     if(historyToDisplay.length === 0) { tbody.innerHTML = `<tr><td colspan="${isAdmin ? 8 + paintTypes.length : 7 + paintTypes.length}" class="px-3 py-2 text-center text-black font-bold uppercase border-b border-black">Brak wyników.</td></tr>`; return; }
 
-    let sumArea = 0, sumCost = 0, sumAreaBlachy = 0, sumAreaProfile = 0;
-    let sumBrands = {}; paintTypes.forEach(pt => sumBrands[pt.id] = { vol: 0, thinner: 0, colors: {} });
-
     let html = '';
     historyToDisplay.forEach(row => {
         let bs = row.brandStats || {};
-        if (!row.isError) {
-            sumArea += row.area || 0; sumCost += row.cost || 0; sumAreaBlachy += row.areaBlachy || 0; sumAreaProfile += row.areaProfile || 0;
-            Object.keys(bs).forEach(brand => {
-                if(!sumBrands[brand]) sumBrands[brand] = { vol: 0, thinner: 0, colors: {} };
-                sumBrands[brand].vol += bs[brand].vol || 0; sumBrands[brand].thinner += bs[brand].thinner || 0;
-                for (let c in bs[brand].colors) sumBrands[brand].colors[c] = (sumBrands[brand].colors[c] || 0) + bs[brand].colors[c];
-            });
-        }
 
         const safeProtocol = escapeHTML(row.protocolNumber || '-');
         const safeProject = escapeHTML(row.projectName || '-');
@@ -517,7 +504,6 @@ export function renderHistoryTable() {
 
         let actionsHtml = `<div class="flex flex-col gap-1 items-stretch w-16 mx-auto"><button onclick="loadHistoryItem('${row.id}', 'history')" class="text-black font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-black hover:text-white bg-white leading-none">PODGLĄD</button><button onclick="editHistoryItem('${row.id}', 'history')" class="text-white bg-blue-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-blue-800 leading-none">EDYTUJ</button></div>`;
 
-        // Generowanie HTML dla kolumny z Autorem i statusem akceptacji
         let authorHtml = `<div class="whitespace-normal">${row.author || '-'}</div>`;
         if (row.isAccepted) {
             authorHtml += `<div class="mt-1 text-[9px] text-green-700 font-bold uppercase border-t border-green-300 pt-0.5">ZAAKCEPTOWAŁ(A):<br>${escapeHTML(row.acceptedBy)}</div>`;
@@ -530,16 +516,6 @@ export function renderHistoryTable() {
         html += `<tr class="${trClass}">${checkboxCell}<td class="px-3 py-1.5 border-r border-b border-black font-bold">${safeProtocol}</td><td class="px-3 py-1.5 border-r border-b border-black font-bold">${row.date}</td><td class="px-3 py-1.5 border-r border-b border-black font-bold uppercase">${safeProject}</td><td class="px-3 py-1.5 border-r border-b border-black text-right"><div class="font-bold">${formatNumber(row.area, 2)}</div><div class="text-[9px] text-gray-600 uppercase mt-0.5 whitespace-nowrap">B: ${formatNumber(row.areaBlachy, 2)} | P: ${formatNumber(row.areaProfile, 2)}</div></td>${paintColsHtml}<td class="px-3 py-1.5 border-r border-b border-black text-right font-bold">${formatNumber(thTotal, 2)}</td><td class="px-3 py-1.5 border-r border-b border-black text-right font-bold">${formatNumber(row.cost, 2)}</td><td class="px-3 py-1.5 border-r border-b border-black text-[10px] align-middle">${authorHtml}</td><td class="px-2 py-1.5 border-b border-black text-center print-hide no-underline align-middle">${actionsHtml}</td></tr>`;
     });
 
-    const genBrandFooter = (ptName, bData) => {
-        if (!bData || (bData.vol <= 0 && bData.thinner <= 0)) return '';
-        const getHex = (cName) => { const rule = shopPrimerRules.find(r => r.colorName.toUpperCase() === cName.trim().toUpperCase()); return rule ? rule.colorHex : 'transparent'; };
-        let cHtml = Object.entries(bData.colors).map(([c, v]) => `<div class="flex items-center gap-1 mt-0.5"><span class="w-2.5 h-2.5 inline-block border border-black" style="background-color: ${getHex(c)}"></span><span>${c}: ${formatNumber(v)} L</span></div>`).join('');
-        if(!cHtml) cHtml = "-";
-        return `<div class="border border-black p-1 bg-white flex-1 min-w-[100px] text-[9px] mb-1"><div class="font-bold border-b border-black mb-0.5 truncate" title="${ptName}">${ptName}</div><div class="flex justify-between gap-1"><div><span class="underline text-[8px]">KOLORY:</span><br>${cHtml}</div><div class="text-right"><span class="underline text-[8px]">SUMA:</span><br>Farba: ${formatNumber(bData.vol)} L<br>Rozc: ${formatNumber(bData.thinner)} L</div></div></div>`;
-    };
-
-    let brandsHtml = paintTypes.map(pt => genBrandFooter(pt.name, sumBrands[pt.id])).join('');
-    html += `<tr class="bg-gray-100 font-bold border-t-2 border-black"><td colspan="${isAdmin ? 4 : 3}" class="px-3 py-2 border-r border-black text-right text-black uppercase align-middle">PODSUMOWANIE WIDOCZNYCH:</td><td class="px-3 py-2 border-r border-black text-right text-black text-[10px] align-top">Blachy: ${formatNumber(sumAreaBlachy, 2)}<br>Profile: ${formatNumber(sumAreaProfile, 2)}<br><span class="font-bold text-xs mt-1 block border-t border-gray-300 pt-1">Suma: ${formatNumber(sumArea, 2)}</span></td><td colspan="${paintTypes.length + 1}" class="px-3 py-2 border-r border-black text-right text-black align-top"><div class="flex flex-wrap gap-1 text-left">${brandsHtml || 'Brak farb'}</div></td><td class="px-3 py-2 border-r border-black text-right text-black align-bottom">${formatNumber(sumCost, 2)}</td><td class="px-3 py-2 border-r border-black"></td><td class="px-3 py-2 border-black print-hide"></td></tr>`;
     tbody.innerHTML = html;
 }
 
