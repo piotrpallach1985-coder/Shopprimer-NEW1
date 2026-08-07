@@ -301,7 +301,8 @@
                 <h1 class="text-xl md:text-2xl font-bold text-black flex items-center gap-2 uppercase tracking-wide">
                     SHOPPRIMER <span class="bg-black text-white px-2 py-0.5 text-sm ml-2">WEB v.2.1 TEST</span>
                     <span id="welcomeMessage" class="hidden text-sm font-normal normal-case text-gray-600 ml-2 print-hide">
-                        WITAJ: <span id="welcomeName" class="font-bold text-black uppercase"></span>
+                        <!-- POPRAWKA: Użycie właściwego ID -->
+                        WITAJ: <span id="loggedUserName" class="font-bold text-black uppercase"></span>
                     </span>
                 </h1>
                 <!-- STATUS SYNCHRONIZACJI Z CHMURĄ -->
@@ -323,8 +324,8 @@
             </div>
         </header>
 
-        <!-- ZAKŁADKI -->
-        <div class="sticky top-0 z-50 bg-white flex flex-wrap items-end space-x-1 border-b-2 border-black mt-2 print-hide px-1 gap-y-1 relative" id="mainTabsContainer">
+        <!-- ZAKŁADKI - POPRAWKA: dodano sticky top-0 bg-white z-50 -->
+        <div class="flex flex-wrap items-end space-x-1 border-b-2 border-black mt-2 print-hide px-1 gap-y-1 relative sticky top-0 bg-white z-50 pt-2 pb-1" id="mainTabsContainer">
             <button id="tab-daily" onclick="switchTab('daily')" class="px-2 py-1.5 border-2 border-black border-b-0 bg-white text-black text-xs font-bold focus:outline-none whitespace-nowrap z-10">
                 ROZLICZENIE DZIENNE
             </button>
