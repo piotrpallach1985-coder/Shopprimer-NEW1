@@ -71,18 +71,17 @@ export async function saveToSummaryInternal() {
         const authorStr = oldEntry.author + `<br><span class="text-[9px] text-gray-600 font-normal">[Edycja: ${currUserStr} ${editDateStr}]</span>`;
 
         printHistory[existingEntryIndex] = {
-            id: oldEntry.id, protocolNumber: oldEntry.protocolNumber, projectName: data.projectName, date: dateStr, unit: data.projectName, area: data.area, cost: data.cost, areaBlachy: data.areaBlachy, areaProfile: data.areaProfile, brandStats: data.brandStats, thinnerVol: totalThinner, isError: oldEntry.isError, author: authorStr, items: JSON.parse(JSON.stringify(data.items)), appliedRates: appliedRates, lastModified: Date.now()
+            id: oldEntry.id, protocolNumber: oldEntry.protocolNumber, projectName: data.projectName, date: dateStr, unit: data.projectName, area: data.area, cost: data.cost, areaBlachy: data.areaBlachy, areaProfile: data.areaProfile, brandStats: data.brandStats, thinnerVol: totalThinner, isError: oldEntry.isError, author: authorStr, items: JSON.parse(JSON.stringify(data.items)), appliedRates: appliedRates, lastModified: Date.now(),
+            isAccepted: false, acceptedBy: null, rejectionComment: null, rejectedBy: null
         };
         generatedNumbers.push(oldEntry.protocolNumber);
         if (window.cancelEditMode) window.cancelEditMode();
     } else {
-        // Logika generowania dynamicznego numeru Protokołu wg miesiąca i roku
         const parts = dateStr.split('.');
         const monthStr = parts[1] || String(new Date().getMonth() + 1).padStart(2, '0');
         const yearStr = parts[2] || String(new Date().getFullYear());
         const suffix = `/${monthStr}/${yearStr}`;
 
-        // Szukanie najwyższego numeru z tego konkretnego miesiąca
         let maxNum = 0;
         printHistory.forEach(entry => {
             if (entry.protocolNumber && entry.protocolNumber.endsWith(suffix)) {
@@ -101,7 +100,6 @@ export async function saveToSummaryInternal() {
                 if(data.brandStats[pt.id]) { data.brandStats[pt.id].thinner = data.brandStats[pt.id].vol * (data.brandStats[pt.id].pct / 100); totalThinner += data.brandStats[pt.id].thinner; }
             });
             
-            // Podnosimy licznik miesięczny o 1 dla każdej nowej pozycji
             currentMonthCounter++;
             const newProtocolNumber = `${currentMonthCounter}${suffix}`;
             generatedNumbers.push(newProtocolNumber);
@@ -122,7 +120,11 @@ export async function saveToSummaryInternal() {
                 author: currentUser ? (currentUser.name || currentUser.login) : "Nieznany", 
                 items: JSON.parse(JSON.stringify(data.items)), 
                 appliedRates: appliedRates, 
-                lastModified: Date.now()
+                lastModified: Date.now(),
+                isAccepted: false,
+                acceptedBy: null,
+                rejectionComment: null,
+                rejectedBy: null
             });
         }
     }
@@ -176,8 +178,50 @@ export function printHistoryProtocol() {
     document.body.classList.remove('print-history');
 }
 
+export async function acceptCurrentPreview() {
+    if (!window.previewHistoryId) return;
+    const entry = printHistory.find(e => e.id.toString() === window.previewHistoryId.toString());
+    if (!entry) return;
+    
+    if (await window.customConfirm("Czy na pewno chcesz potwierdzić przyjęcie tej kalkulacji?")) {
+        entry.isAccepted = true;
+        entry.acceptedBy = currentUser ? (currentUser.name || currentUser.login) : "System";
+        entry.rejectionComment = null; 
+        entry.rejectedBy = null;
+        autoSaveToDisk(true);
+        if (window.renderHistoryTable) window.renderHistoryTable();
+        
+        // Odśwież widok paska
+        loadHistoryItem(window.previewHistoryId, window.sourceTabForPreview);
+        await window.customAlert("Kalkulacja została pomyślnie oznaczona jako przyjęta.");
+    }
+}
+
+export async function rejectCurrentPreview() {
+    if (!window.previewHistoryId) return;
+    const entry = printHistory.find(e => e.id.toString() === window.previewHistoryId.toString());
+    if (!entry) return;
+
+    const comment = await window.customPrompt("Podaj powód odrzucenia/braku akceptacji (np. błąd w metrażu, zły kolor):", "text");
+    if (comment !== null && comment.trim() !== "") {
+        entry.isAccepted = false;
+        entry.acceptedBy = null;
+        entry.rejectionComment = comment.trim();
+        entry.rejectedBy = currentUser ? (currentUser.name || currentUser.login) : "System";
+        autoSaveToDisk(true);
+        if (window.renderHistoryTable) window.renderHistoryTable();
+        
+        // Odśwież widok paska
+        loadHistoryItem(window.previewHistoryId, window.sourceTabForPreview);
+        await window.customAlert("Kalkulacja została oznaczona jako ODRZUCONA.");
+    } else if (comment !== null) {
+        await window.customAlert("Komentarz do odrzucenia nie może być pusty!");
+    }
+}
+
 export async function loadHistoryItem(id, sourceTab = 'history') {
     window.sourceTabForPreview = sourceTab;
+    window.previewHistoryId = id; 
     const entry = printHistory.find(e => e.id.toString() === id.toString());
     if (!entry || !entry.items) { await window.customAlert("Brak szczegółów dla tej kalkulacji."); return; }
     
@@ -199,10 +243,44 @@ export async function loadHistoryItem(id, sourceTab = 'history') {
     window.isPreviewMode = true; 
     window.currentPreviewProtocolNumber = entry.protocolNumber || "-";
     
-    // Wpisanie numeru protokołu i projektu do elementów UI
     document.querySelectorAll('.print-protocol-number').forEach(el => el.textContent = window.currentPreviewProtocolNumber);
     document.querySelectorAll('.print-project-name').forEach(el => el.textContent = projName || "-");
     
+    // Dynamiczne wstrzykiwanie UI akceptacji na pasku podglądu
+    const banner = document.getElementById('previewBanner');
+    if (banner) {
+        const oldBtn = document.getElementById('previewAcceptUI');
+        if (oldBtn) oldBtn.remove();
+        
+        const uiContainer = document.createElement('div');
+        uiContainer.id = 'previewAcceptUI';
+        uiContainer.className = 'ml-auto mr-4 flex items-center gap-2 print-hide';
+        
+        if (entry.isAccepted) {
+            uiContainer.innerHTML = `<span class="text-green-800 font-bold text-xs uppercase bg-green-100 px-2 py-1 border border-green-800 shadow-sm">ZAAKCEPTOWANO PRZEZ: ${escapeHTML(entry.acceptedBy)}</span>`;
+        } else if (entry.rejectionComment) {
+            uiContainer.innerHTML = `
+                <div class="flex items-center gap-2">
+                    <span class="text-red-800 font-bold text-[10px] bg-red-100 px-2 py-1 border border-red-800 shadow-sm max-w-xs truncate" title="${escapeHTML(entry.rejectionComment)}">
+                        <span class="uppercase">ODRZUCONO (${escapeHTML(entry.rejectedBy)}):</span> <span class="font-normal italic">${escapeHTML(entry.rejectionComment)}</span>
+                    </span>
+                    <button onclick="acceptCurrentPreview()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 text-[10px] uppercase border border-black shadow-sm transition">WYJAŚNIONE (ZATWIERDŹ)</button>
+                </div>
+            `;
+        } else {
+            uiContainer.innerHTML = `
+                <button onclick="acceptCurrentPreview()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-4 text-xs uppercase border border-black shadow-sm transition">POTWIERDŹ PRZYJĘCIE</button>
+                <button onclick="rejectCurrentPreview()" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-4 text-xs uppercase border border-black shadow-sm transition">ODRZUĆ (KOMENTARZ)</button>
+            `;
+        }
+        
+        if (banner.lastElementChild) {
+            banner.insertBefore(uiContainer, banner.lastElementChild);
+        } else {
+            banner.appendChild(uiContainer);
+        }
+    }
+
     document.getElementById('addFormContainer').classList.add('hidden'); 
     document.getElementById('previewBanner').classList.remove('hidden'); 
     document.getElementById('previewBanner').classList.add('flex');
@@ -249,7 +327,6 @@ export async function editHistoryItem(id, sourceTab = 'history') {
     window.currentPreviewProtocolNumber = entry.protocolNumber || "-"; 
     window.editingProtocolId = id; 
     
-    // Wpisanie numeru protokołu i projektu do elementów UI w trybie edycji
     document.querySelectorAll('.print-protocol-number').forEach(el => el.textContent = window.currentPreviewProtocolNumber);
     document.querySelectorAll('.print-project-name').forEach(el => el.textContent = projName || "-");
     
@@ -269,12 +346,15 @@ export function exitPreviewMode() {
     if (window.cancelEditMode) window.cancelEditMode(); 
     window.isPreviewMode = false; 
     window.currentPreviewProtocolNumber = null;
+    window.previewHistoryId = null;
     document.getElementById('protocolDateInput').disabled = false;
     
-    // Wyczyszczenie etykiet po wyjściu z podglądu
     document.querySelectorAll('.print-protocol-number').forEach(el => el.textContent = "");
     document.querySelectorAll('.print-project-name').forEach(el => el.textContent = "");
     
+    const acceptUI = document.getElementById('previewAcceptUI');
+    if (acceptUI) acceptUI.remove();
+
     if (window.tempInputData) { 
         setInputData(window.tempInputData); 
         window.tempInputData = null; 
@@ -348,7 +428,7 @@ export function renderHistoryTable() {
     const checkboxTh = isAdmin ? `<th id="colHistCheck" class="px-3 py-2 border-r border-black print-hide text-center w-8 align-middle"><input type="checkbox" id="selectAllHistory" onchange="toggleSelectAllHistory()" class="cursor-pointer w-4 h-4"></th>` : '';
     const paintColsTh = paintTypes.map(pt => `<th class="px-3 py-2 border-r border-black text-right truncate max-w-[80px]" title="${pt.name}">${pt.name}[L]</th>`).join('');
 
-    theadTr.innerHTML = `${checkboxTh}<th class="px-3 py-2 border-r border-black">Nr Kalkulacji</th><th class="px-3 py-2 border-r border-black">Data</th><th class="px-3 py-2 border-r border-black">Jednostka</th><th class="px-3 py-2 border-r border-black text-right">Pow.[m²]</th>${paintColsTh}<th class="px-3 py-2 border-r border-black text-right">Rozc.[l]</th><th class="px-3 py-2 border-r border-black text-right">Koszty[PLN]</th><th class="px-3 py-2 border-r border-black">Autor</th><th class="px-3 py-2 text-center print-hide">Akcja</th>`;
+    theadTr.innerHTML = `${checkboxTh}<th class="px-3 py-2 border-r border-black">Nr Kalkulacji</th><th class="px-3 py-2 border-r border-black">Data</th><th class="px-3 py-2 border-r border-black">Jednostka</th><th class="px-3 py-2 border-r border-black text-right">Pow.[m²]</th>${paintColsTh}<th class="px-3 py-2 border-r border-black text-right">Rozc.[l]</th><th class="px-3 py-2 border-r border-black text-right">Koszty[PLN]</th><th class="px-3 py-2 border-r border-black">Autor & Akceptacja</th><th class="px-3 py-2 text-center print-hide">Akcja</th>`;
 
     const btnDeleteSel = document.getElementById('btnDeleteSelectedHistory');
     if (btnDeleteSel) btnDeleteSel.style.display = isAdmin ? 'inline-block' : 'none';
@@ -408,7 +488,17 @@ export function renderHistoryTable() {
 
         let actionsHtml = `<div class="flex flex-col gap-1 items-stretch w-16 mx-auto"><button onclick="loadHistoryItem('${row.id}', 'history')" class="text-black font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-black hover:text-white bg-white leading-none">PODGLĄD</button><button onclick="editHistoryItem('${row.id}', 'history')" class="text-white bg-blue-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-blue-800 leading-none">EDYTUJ</button></div>`;
 
-        html += `<tr class="${trClass}">${checkboxCell}<td class="px-3 py-1.5 border-r border-b border-black font-bold">${safeProtocol}</td><td class="px-3 py-1.5 border-r border-b border-black font-bold">${row.date}</td><td class="px-3 py-1.5 border-r border-b border-black font-bold uppercase">${safeProject}</td><td class="px-3 py-1.5 border-r border-b border-black text-right"><div class="font-bold">${formatNumber(row.area, 2)}</div><div class="text-[9px] text-gray-600 uppercase mt-0.5 whitespace-nowrap">B: ${formatNumber(row.areaBlachy, 2)} | P: ${formatNumber(row.areaProfile, 2)}</div></td>${paintColsHtml}<td class="px-3 py-1.5 border-r border-b border-black text-right font-bold">${formatNumber(thTotal, 2)}</td><td class="px-3 py-1.5 border-r border-b border-black text-right font-bold">${formatNumber(row.cost, 2)}</td><td class="px-3 py-1.5 border-r border-b border-black text-[10px] whitespace-normal">${row.author || '-'}</td><td class="px-2 py-1.5 border-b border-black text-center print-hide no-underline align-middle">${actionsHtml}</td></tr>`;
+        // Generowanie HTML dla kolumny z Autorem i statusem akceptacji
+        let authorHtml = `<div class="whitespace-normal">${row.author || '-'}</div>`;
+        if (row.isAccepted) {
+            authorHtml += `<div class="mt-1 text-[9px] text-green-700 font-bold uppercase border-t border-green-300 pt-0.5">ZAAKCEPTOWAŁ(A):<br>${escapeHTML(row.acceptedBy)}</div>`;
+        } else if (row.rejectionComment) {
+            authorHtml += `<div class="mt-1 text-[9px] text-red-700 font-bold border-t border-red-300 pt-0.5" title="${escapeHTML(row.rejectionComment)}"><span class="uppercase">ODRZUCONO:</span><br><span class="font-normal italic">${escapeHTML(row.rejectionComment)}</span></div>`;
+        } else {
+            authorHtml += `<div class="mt-1 text-[9px] text-orange-600 font-bold uppercase border-t border-orange-300 pt-0.5">OCZEKUJE</div>`;
+        }
+
+        html += `<tr class="${trClass}">${checkboxCell}<td class="px-3 py-1.5 border-r border-b border-black font-bold">${safeProtocol}</td><td class="px-3 py-1.5 border-r border-b border-black font-bold">${row.date}</td><td class="px-3 py-1.5 border-r border-b border-black font-bold uppercase">${safeProject}</td><td class="px-3 py-1.5 border-r border-b border-black text-right"><div class="font-bold">${formatNumber(row.area, 2)}</div><div class="text-[9px] text-gray-600 uppercase mt-0.5 whitespace-nowrap">B: ${formatNumber(row.areaBlachy, 2)} | P: ${formatNumber(row.areaProfile, 2)}</div></td>${paintColsHtml}<td class="px-3 py-1.5 border-r border-b border-black text-right font-bold">${formatNumber(thTotal, 2)}</td><td class="px-3 py-1.5 border-r border-b border-black text-right font-bold">${formatNumber(row.cost, 2)}</td><td class="px-3 py-1.5 border-r border-b border-black text-[10px] align-middle">${authorHtml}</td><td class="px-2 py-1.5 border-b border-black text-center print-hide no-underline align-middle">${actionsHtml}</td></tr>`;
     });
 
     const genBrandFooter = (ptName, bData) => {
@@ -452,6 +542,12 @@ export async function exportHistoryToExcel() {
         paintTypes.forEach(pt => { let vol = bs[pt.id] ? (bs[pt.id].vol || 0) : 0; rowExport[`${pt.name} [L]`] = vol; if(bs[pt.id]) thTotal += bs[pt.id].thinner || 0; });
         if (row.thinnerVol && thTotal === 0) thTotal = row.thinnerVol; 
         rowExport["Rozcieńczalnik [L]"] = thTotal; rowExport["Koszty Całkowite [PLN]"] = row.cost; rowExport["Status"] = row.isError ? "BŁĘDNY" : "OK"; rowExport["Zatwierdził"] = row.author || "Brak";
+        
+        let statusAkceptacji = "OCZEKUJE";
+        if (row.isAccepted) statusAkceptacji = `ZAAKCEPTOWANO (${row.acceptedBy})`;
+        else if (row.rejectionComment) statusAkceptacji = `ODRZUCONO: ${row.rejectionComment}`;
+        rowExport["Akceptacja"] = statusAkceptacji;
+        
         return rowExport;
     });
 
@@ -479,6 +575,8 @@ window.printHistoryProtocol = printHistoryProtocol;
 window.loadHistoryItem = loadHistoryItem;
 window.editHistoryItem = editHistoryItem;
 window.exitPreviewMode = exitPreviewMode;
+window.acceptCurrentPreview = acceptCurrentPreview;
+window.rejectCurrentPreview = rejectCurrentPreview;
 window.toggleSelectAllHistory = toggleSelectAllHistory;
 window.deleteSelectedHistoryItemsWithPin = deleteSelectedHistoryItemsWithPin;
 window.renderHistoryTable = renderHistoryTable;
