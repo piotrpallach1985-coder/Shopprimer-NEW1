@@ -505,7 +505,6 @@
             <div class="bg-white p-4 border border-black mt-4 print-hide">
                 <h2 class="text-sm font-bold text-black mb-3 border-b border-black pb-1 uppercase">Porównanie miesięczne - Wykresy</h2>
                 
-                <!-- POPRAWKA: Ukryty wybór daty dla wykresów -->
                 <div class="mb-4 w-full sm:w-48 hidden">
                     <label class="block text-xs font-bold text-black mb-1 uppercase">Wybierz miesiąc</label>
                     <input type="month" id="compareMonthDate" onchange="renderMonthlyCompareCharts()" class="w-full border border-black p-1.5 text-sm outline-none bg-yellow-50 focus:bg-white font-bold cursor-pointer hover:bg-gray-100">
@@ -877,17 +876,31 @@
             <div id="dbPreviewSection" class="bg-white border border-black hidden flex-col overflow-hidden">
                 <div class="p-3 border-b border-black flex flex-col sm:flex-row justify-between items-center bg-white gap-3 print-hide">
                     <h2 class="text-sm font-bold text-black uppercase">Zarządzaj bazą</h2>
-                    <div class="flex items-center gap-2">
-                        <input type="text" id="dbSearchInput" oninput="filterDbTable()" placeholder="Wyszukaj..." class="w-full sm:w-64 border border-black p-1 text-xs outline-none">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <select id="dbFilterKategoria" onchange="filterDbTable()" class="w-full sm:w-48 border border-black p-1 text-xs outline-none bg-yellow-50 focus:bg-white font-bold cursor-pointer">
+                            <option value="">WSZYSTKIE GRUPY</option>
+                            <option value="Profile HP">Profile HP</option>
+                            <option value="Kątowniki L">Kątowniki L</option>
+                            <option value="Ceowniki UNP">Ceowniki UNP</option>
+                            <option value="Teowniki T">Teowniki T</option>
+                            <option value="Profile IPE">Profile IPE</option>
+                            <option value="Profile HEB-HEA">Profile HEB-HEA</option>
+                            <option value="Profile półokrągłe HR">Profile półokrągłe HR</option>
+                            <option value="Rury kwadratowe RHS">Rury kwadratowe RHS</option>
+                            <option value="Rury">Rury</option>
+                            <option value="Pręty okrągłe (Ø)">Pręty okrągłe (Ø)</option>
+                        </select>
+                        <input type="text" id="dbSearchInput" oninput="filterDbTable()" placeholder="Wyszukaj po nazwie..." class="w-full sm:w-64 border border-black p-1 text-xs outline-none focus:bg-yellow-50">
                         <span id="dbCountBadge" class="bg-white text-black border border-black px-2 py-0.5 text-xs font-bold">0</span>
                     </div>
                 </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-xs whitespace-nowrap">
-                        <thead class="bg-white text-black font-bold sticky top-0 uppercase border-b-2 border-black">
+                <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
+                    <table class="w-full text-left text-xs whitespace-nowrap table-auto">
+                        <thead class="bg-white text-black font-bold sticky top-0 uppercase border-b-2 border-black z-10">
                             <tr>
                                 <th class="px-3 py-2 border-r border-black">Nazwa Profilu</th>
-                                <th class="px-3 py-2 text-right">Mnożnik pow. ✎</th>
+                                <th class="px-3 py-2 text-right border-r border-black">Mnożnik pow. ✎</th>
+                                <th class="px-3 py-2 text-center w-16">Akcja</th>
                             </tr>
                         </thead>
                         <tbody id="dbTableBody" class="divide-y divide-black bg-white"></tbody>
