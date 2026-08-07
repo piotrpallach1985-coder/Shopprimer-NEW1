@@ -116,18 +116,28 @@ export function switchTab(tabId, bypassCheck = false) {
 export function applyUserPermissions() {
     if (!currentUser) return;
     
-    const allTabs = AVAILABLE_TABS.map(t => t.id);
-    allTabs.push('users'); 
+    const allStandardTabs = AVAILABLE_TABS.map(t => t.id);
     
-    let allowed = currentUser.role === 'admin' ? allTabs : (currentUser.allowedTabs || allTabs);
-    let visible = currentUser.preferredTabs || allowed;
+    let allowed = [];
+    
+    if (currentUser.role === 'admin') {
+        // Admin widzi wszystkie moduły ORAZ zakładkę z ustawieniami ("users")
+        allowed = [...allStandardTabs, 'users'];
+    } else {
+        // Zwykły użytkownik widzi tylko to, co nadano mu w panelu (albo domyślne moduły)
+        allowed = currentUser.allowedTabs || allStandardTabs;
+        // Twarde usunięcie zakładki ustawień dla nie-adminów
+        allowed = allowed.filter(t => t !== 'users'); 
+    }
+
     const readOnlyTabs = currentUser.role === 'admin' ? [] : (currentUser.readOnlyTabs || []);
 
-    allTabs.forEach(tab => {
+    const allPossibleTabs = [...allStandardTabs, 'users'];
+
+    allPossibleTabs.forEach(tab => {
         const btn = document.getElementById('tab-' + tab);
         if (btn) {
-            const isVisible = allowed.includes(tab) && visible.includes(tab);
-            btn.style.display = isVisible ? 'inline-block' : 'none';
+            btn.style.display = allowed.includes(tab) ? 'inline-block' : 'none';
         }
         const viewEl = document.getElementById('view-' + tab);
         if (viewEl) {
@@ -139,18 +149,17 @@ export function applyUserPermissions() {
         }
     });
     
-    const activeViews = allTabs.filter(tab => {
+    // Ustalanie aktywnej zakładki (żeby nie zostawić użytkownika na pustym ekranie)
+    const activeViews = allPossibleTabs.filter(tab => {
         const v = document.getElementById('view-' + tab);
         return v && !v.classList.contains('hidden');
     });
     
     let targetTab = null;
-    if (activeViews.length > 0 && (!allowed.includes(activeViews[0]) || !visible.includes(activeViews[0]))) {
-        targetTab = visible.find(t => t !== 'users') || 'users'; 
+    if (activeViews.length > 0 && !allowed.includes(activeViews[0])) {
+        targetTab = allowed[0] || 'daily'; 
     } else if (activeViews.length === 0) {
-        targetTab = visible.find(t => t !== 'users') || 'users';
-    } else if (activeViews.length > 0) {
-        targetTab = activeViews[0];
+        targetTab = allowed[0] || 'daily';
     }
 
     if (targetTab && window.switchTab) {
@@ -159,47 +168,17 @@ export function applyUserPermissions() {
 }
 
 export function renderUserPreferences() {
-    if (!currentUser) return;
+    // Usunięto sekcję "Dostosuj swój widok".
+    // Ten kod agresywnie ukrywa cały element w HTML, żeby nie zaśmiecał ekranu administratora.
     const grid = document.getElementById('userPreferencesGrid');
-    if (!grid) return;
-    
-    const allTabs = AVAILABLE_TABS.map(t => t);
-    allTabs.push({ id: 'users', name: 'Ustawienia' }); 
-    
-    const allowed = currentUser.role === 'admin' ? allTabs.map(t=>t.id) : (currentUser.allowedTabs || allTabs.map(t=>t.id));
-    const preferred = currentUser.preferredTabs || allowed;
-
-    let html = '';
-    allTabs.forEach(tab => {
-        if (allowed.includes(tab.id)) {
-            const isChecked = preferred.includes(tab.id);
-            const isUsersTab = tab.id === 'users';
-            html += `
-                <label class="flex items-center gap-2 cursor-pointer bg-white p-2 border border-black hover:bg-gray-100">
-                    <input type="checkbox" class="user-pref-tab-cb w-4 h-4 cursor-pointer" value="${tab.id}" ${isChecked || isUsersTab ? 'checked' : ''} ${isUsersTab ? 'disabled' : ''}>
-                    <span class="text-xs font-bold uppercase">${tab.name || tab.id}</span>
-                </label>
-            `;
-        }
-    });
-    grid.innerHTML = html;
+    if (grid) {
+        const container = grid.closest('.border-black');
+        if (container) container.style.display = 'none';
+    }
 }
 
 export async function saveUserPreferences() {
-    if (!currentUser) return;
-    const checkboxes = document.querySelectorAll('.user-pref-tab-cb');
-    const preferred = Array.from(checkboxes).filter(cb => cb.checked || cb.disabled).map(cb => cb.value); 
-    
-    currentUser.preferredTabs = preferred;
-    
-    const userIndex = usersList.findIndex(u => u.login === currentUser.login);
-    if (userIndex !== -1) {
-        usersList[userIndex].preferredTabs = preferred;
-    }
-    
-    applyUserPermissions();
-    if (window.autoSaveToDisk) window.autoSaveToDisk(true);
-    await customAlert("Twój widok zakładek został zaktualizowany.");
+    // Pusta funkcja - nie jest już potrzebna, zapobiega potencjalnym błędom w logach.
 }
 
 export function renderUsersTable() {
@@ -238,11 +217,10 @@ export function editUser(login) {
     const adminCb = document.getElementById('editUserAdmin');
     adminCb.checked = u.role === 'admin';
     
-    // Generowanie siatki zakładek w oknie edycji
+    // Generowanie siatki zakładek w oknie edycji (tylko moduły bez sekcji ustawień)
     const tabsContainer = document.getElementById('editUserTabsGrid');
     if (tabsContainer) {
         const allTabs = AVAILABLE_TABS.map(t => t);
-        allTabs.push({ id: 'users', name: 'Ustawienia' });
         
         const allowed = u.allowedTabs || allTabs.map(t => t.id);
         
@@ -272,16 +250,24 @@ export async function saveEditUser() {
     u.name = document.getElementById('editUserName').value.trim();
     u.role = document.getElementById('editUserAdmin').checked ? 'admin' : 'user';
 
-    // Zbieramy zaznaczone uprawnienia do zakładek
+    // Zbieramy zaznaczone uprawnienia do zakładek (tylko z dostepnych checkboxes)
     const checkboxes = document.querySelectorAll('.edit-user-tab-cb');
     if (checkboxes.length > 0) {
         u.allowedTabs = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
     }
 
     renderUsersTable();
-    autoSaveToDisk(true);
+    
+    // Odświeżenie uprawnień od razu w interfejsie, jeśli admin edytuje samego siebie
+    if (currentUser && currentUser.login === u.login) {
+        currentUser.role = u.role;
+        currentUser.allowedTabs = u.allowedTabs;
+        applyUserPermissions();
+    }
+    
+    if (window.autoSaveToDisk) window.autoSaveToDisk(true);
     closeEditUserModal();
-    await customAlert("Zapisano zmiany użytkownika.");
+    await customAlert("Zapisano zmiany uprawnień użytkownika.");
 }
 
 export async function addNewUser() {
@@ -297,9 +283,8 @@ export async function addNewUser() {
     }
 
     const allTabs = AVAILABLE_TABS.map(t => t.id);
-    allTabs.push('users');
-
-    const newUsers = [...usersList, { login, name, role: isAdmin ? 'admin' : 'user', allowedTabs: allTabs, preferredTabs: allTabs }];
+    
+    const newUsers = [...usersList, { login, name, role: isAdmin ? 'admin' : 'user', allowedTabs: allTabs }];
     setUsersList(newUsers);
 
     document.getElementById('formNewUserLogin').value = '';
@@ -307,7 +292,7 @@ export async function addNewUser() {
     document.getElementById('formNewUserAdmin').checked = false;
 
     renderUsersTable();
-    autoSaveToDisk(true);
+    if (window.autoSaveToDisk) window.autoSaveToDisk(true);
     await customAlert("Dodano użytkownika do listy uprawnień.");
 }
 
@@ -317,7 +302,7 @@ export async function resetProtocolCounter() {
             let state = window.getProjectState();
             state.protocolCounter = 0;
         }
-        autoSaveToDisk();
+        if (window.autoSaveToDisk) window.autoSaveToDisk();
         await customAlert("Numeracja kalkulacji została zresetowana.");
     }
 }
