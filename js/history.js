@@ -369,14 +369,16 @@ export async function editHistoryItem(id, sourceTab = 'history') {
     if (window.calculate) window.calculate();
 }
 
-// Funkcja pomocnicza używana wewnętrznie do czyszczenia stanu UI po edycji
+// =====================================
+// BRAKUJĄCE FUNKCJE ANULOWANIA EDYCJI 
+// =====================================
+
 export function cancelEditMode() {
     window.editingProtocolId = null;
     const btnCancel = document.getElementById('btnCancelEdit');
     if (btnCancel) btnCancel.classList.add('hidden');
 }
 
-// Funkcja docelowo połączona z przyciskiem Anuluj (btnCancelEdit)
 export async function cancelEditProtocol() {
     if (await window.customConfirm("Czy na pewno chcesz anulować edycję? Niezapisane zmiany zostaną utracone.")) {
         cancelEditMode();
@@ -613,8 +615,8 @@ window.printProtocol = printProtocol;
 window.printHistoryProtocol = printHistoryProtocol;
 window.loadHistoryItem = loadHistoryItem;
 window.editHistoryItem = editHistoryItem;
-window.cancelEditProtocol = cancelEditProtocol; // <--- DODANA FUNKCJA
-window.cancelEditMode = cancelEditMode;         // <--- DODANA FUNKCJA
+window.cancelEditMode = cancelEditMode;
+window.cancelEditProtocol = cancelEditProtocol; // Funkcja podpięta z powrotem
 window.exitPreviewMode = exitPreviewMode;
 window.acceptCurrentPreview = acceptCurrentPreview;
 window.rejectCurrentPreview = rejectCurrentPreview;
