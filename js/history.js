@@ -180,18 +180,33 @@ export function printHistoryProtocol() {
 
 export async function acceptCurrentPreview() {
     if (!window.previewHistoryId) return;
-    const entry = printHistory.find(e => e.id.toString() === window.previewHistoryId.toString());
-    if (!entry) return;
+    const index = printHistory.findIndex(e => e.id.toString() === window.previewHistoryId.toString());
+    if (index === -1) return;
     
     if (await window.customConfirm("Czy na pewno chcesz potwierdzić przyjęcie tej kalkulacji?")) {
-        entry.isAccepted = true;
-        entry.acceptedBy = currentUser ? (currentUser.name || currentUser.login) : "System";
-        entry.rejectionComment = null; 
-        entry.rejectedBy = null;
+        window.forceNextCloudOverwrite = true; 
+        
+        // Tworzymy NOWĄ tablicę i NOWY obiekt by wymusić zrzut do bazy (niezbędne dla starych protokołów)
+        const newHistory = [...printHistory];
+        newHistory[index] = {
+            ...newHistory[index],
+            isAccepted: true,
+            acceptedBy: currentUser ? (currentUser.name || currentUser.login) : "System",
+            rejectionComment: null,
+            rejectedBy: null,
+            lastModified: Date.now()
+        };
+        
+        setPrintHistory(newHistory);
         autoSaveToDisk(true);
+        
         if (window.renderHistoryTable) window.renderHistoryTable();
         
-        // Odśwież widok paska
+        if (window.updateAllStocks) window.updateAllStocks();
+        if (window.renderDailyLedger && document.getElementById('view-daily') && !document.getElementById('view-daily').classList.contains('hidden')) {
+            window.renderDailyLedger();
+        }
+        
         loadHistoryItem(window.previewHistoryId, window.sourceTabForPreview);
         await window.customAlert("Kalkulacja została pomyślnie oznaczona jako przyjęta.");
     }
@@ -199,19 +214,34 @@ export async function acceptCurrentPreview() {
 
 export async function rejectCurrentPreview() {
     if (!window.previewHistoryId) return;
-    const entry = printHistory.find(e => e.id.toString() === window.previewHistoryId.toString());
-    if (!entry) return;
+    const index = printHistory.findIndex(e => e.id.toString() === window.previewHistoryId.toString());
+    if (index === -1) return;
 
     const comment = await window.customPrompt("Podaj powód odrzucenia/braku akceptacji (np. błąd w metrażu, zły kolor):", "text");
     if (comment !== null && comment.trim() !== "") {
-        entry.isAccepted = false;
-        entry.acceptedBy = null;
-        entry.rejectionComment = comment.trim();
-        entry.rejectedBy = currentUser ? (currentUser.name || currentUser.login) : "System";
+        window.forceNextCloudOverwrite = true; 
+        
+        // Tworzymy NOWĄ tablicę i NOWY obiekt by wymusić zrzut do bazy (niezbędne dla starych protokołów)
+        const newHistory = [...printHistory];
+        newHistory[index] = {
+            ...newHistory[index],
+            isAccepted: false,
+            acceptedBy: null,
+            rejectionComment: comment.trim(),
+            rejectedBy: currentUser ? (currentUser.name || currentUser.login) : "System",
+            lastModified: Date.now()
+        };
+        
+        setPrintHistory(newHistory);
         autoSaveToDisk(true);
+        
         if (window.renderHistoryTable) window.renderHistoryTable();
         
-        // Odśwież widok paska
+        if (window.updateAllStocks) window.updateAllStocks();
+        if (window.renderDailyLedger && document.getElementById('view-daily') && !document.getElementById('view-daily').classList.contains('hidden')) {
+            window.renderDailyLedger();
+        }
+        
         loadHistoryItem(window.previewHistoryId, window.sourceTabForPreview);
         await window.customAlert("Kalkulacja została oznaczona jako ODRZUCONA.");
     } else if (comment !== null) {
@@ -246,7 +276,6 @@ export async function loadHistoryItem(id, sourceTab = 'history') {
     document.querySelectorAll('.print-protocol-number').forEach(el => el.textContent = window.currentPreviewProtocolNumber);
     document.querySelectorAll('.print-project-name').forEach(el => el.textContent = projName || "-");
     
-    // Dynamiczne wstrzykiwanie UI akceptacji na pasku podglądu
     const banner = document.getElementById('previewBanner');
     if (banner) {
         const oldBtn = document.getElementById('previewAcceptUI');
