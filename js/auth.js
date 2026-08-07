@@ -4,7 +4,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebas
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
 import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
-import { usersList } from './store.js'; // Dodano import bazy użytkowników
 
 // Twoja oryginalna konfiguracja
 const firebaseConfig = {
@@ -39,7 +38,7 @@ window.firebaseAuth = auth;
 window.firebaseSignIn = signInWithEmailAndPassword;
 window.firebaseSignOut = signOut;
 
-// Zmienne ES6 wymagane przez ui.js oraz store.js (likwidują błędy z konsoli)
+// Zmienne ES6 wymagane przez ui.js oraz store.js
 export let currentUser = null;
 export let appUsers = []; 
 
@@ -50,32 +49,38 @@ onAuthStateChanged(auth, async (user) => {
     if (user) {
         window.firebaseUser = user; 
         
-        // NAJPIERW ładujemy bazę danych z Firebase (aby usersList było pełne)
+        // Ładujemy bazę danych, jeśli jeszcze jej nie ma
         if (!dataLoaded && window.loadDataFromFirebase) {
             await window.loadDataFromFirebase();
             dataLoaded = true;
         }
 
-        // Szukamy logującego się konta na Twojej głównej liście uprawnień
-        const dbUser = usersList.find(u => u.login.toLowerCase() === user.email.toLowerCase());
+        // Pobieramy bazę użytkowników dynamicznie (w locie), aby uniknąć błędu zapętlenia!
+        let dbUser = null;
+        try {
+            const storeModule = await import('./store.js');
+            if (storeModule.usersList) {
+                dbUser = storeModule.usersList.find(u => u.login.toLowerCase() === user.email.toLowerCase());
+            }
+        } catch(e) {
+            console.warn("Nie udało się pobrać store.js dynamicznie:", e);
+        }
 
-        // Tworzymy obiekt użytkownika pobierając jego prawdziwe dane (Imię i Rola)
+        // Tworzymy obiekt użytkownika
         currentUser = {
             login: user.email,
             name: dbUser ? dbUser.name : (user.displayName || user.email.split('@')[0]), 
-            role: dbUser ? dbUser.role : 'user', // Pobiera admin/user z bazy
+            role: dbUser ? dbUser.role : 'user', 
             allowedTabs: dbUser ? dbUser.allowedTabs : null,
             preferredTabs: null
         };
 
         // Automatyczne wstrzykiwanie imienia w menu HTML
-        // Upewnij się, że masz w HTML np: <span id="loggedUserName"></span>
         const nameElements = document.querySelectorAll('.logged-user-name, #loggedUserName, #currentUserNameDisplay');
         nameElements.forEach(el => {
             el.textContent = currentUser.name;
         });
 
-        // Aby zapobiec błędowi w store.js, wrzucamy go do listy użytkowników
         if (appUsers.length === 0) {
             appUsers.push(currentUser);
         }
@@ -83,19 +88,19 @@ onAuthStateChanged(auth, async (user) => {
         if (window.handleUserAuthenticated) {
             window.handleUserAuthenticated(user);
         }
-        // Aktualizacja widoku po załadowaniu
+        
         if (window.applyUserPermissions) {
             window.applyUserPermissions();
         }
 
-        // Ukrycie ekranu logowania po udanym logowaniu/odświeżeniu
+        // Ukrycie ekranu logowania
         const loginOverlay = document.getElementById('loginOverlay');
         if (loginOverlay) {
             loginOverlay.classList.add('hidden');
             loginOverlay.classList.remove('flex');
         }
 
-        // Zdejmij rozmycie i odblokuj główny interfejs
+        // Odblokowanie interfejsu
         const mainContainer = document.getElementById('mainAppContainer');
         if (mainContainer) {
             mainContainer.classList.remove('locked-ui');
@@ -112,19 +117,16 @@ onAuthStateChanged(auth, async (user) => {
             el.textContent = '';
         });
         
-        // POPRAWKA: wywołujemy funkcję bezpośrednio, nie szukając jej w window
         handleUserLoggedOut(); 
     }
 });
 
-// Funkcje eksportowane do bezpośredniego użycia w kodzie
 export async function login(email, password) {
     try {
         await signInWithEmailAndPassword(auth, email, password);
         return true;
     } catch (error) {
         console.error("Błąd logowania:", error.message);
-        // Jeśli logowanie się nie powiedzie
         return false;
     }
 }
@@ -137,7 +139,6 @@ export async function logout() {
     }
 }
 
-// Funkcja wywoływana po wylogowaniu (wymagana przez main.js)
 export function handleUserLoggedOut() {
     console.log("Użytkownik został wylogowany.");
     
@@ -146,17 +147,12 @@ export function handleUserLoggedOut() {
         mainContainer.classList.add('locked-ui');
     }
 
-    // Jeśli masz ekran logowania, funkcja może go tutaj pokazać:
     const loginOverlay = document.getElementById('loginOverlay');
     if (loginOverlay) {
         loginOverlay.classList.remove('hidden');
         loginOverlay.classList.add('flex');
     }
 }
-
-// ==========================================
-// OBSŁUGA INTERFEJSU LOGOWANIA / WYLOGOWANIA
-// ==========================================
 
 export async function handleLogin() {
     const emailInput = document.getElementById('loginUsername').value.trim();
@@ -171,7 +167,6 @@ export async function handleLogin() {
         return;
     }
 
-    // Wywołujemy naszą właściwą funkcję łączącą się z Firebase
     const success = await login(emailInput, passwordInput);
     
     if (success) {
@@ -190,12 +185,9 @@ export async function handleLogin() {
 }
 
 export async function handleLogout() {
-    await logout(); // Wylogowuje z Firebase
+    await logout();
 }
 
-// ==========================================
-// CZYSZCZENIE ZAWIESZONYCH ALERTÓW
-// ==========================================
 window.clearAllAlerts = function() {
     if(window.getProjectState) {
         let state = window.getProjectState();
@@ -207,6 +199,5 @@ window.clearAllAlerts = function() {
     }
 };
 
-// Najważniejsze: udostępniamy te funkcje dla przycisków w pliku index.html
 window.handleLogin = handleLogin;
 window.handleLogout = handleLogout;
