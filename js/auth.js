@@ -4,6 +4,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebas
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
 import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+import { usersList } from './store.js'; // Dodano import bazy użytkowników
 
 // Twoja oryginalna konfiguracja
 const firebaseConfig = {
@@ -49,25 +50,36 @@ onAuthStateChanged(auth, async (user) => {
     if (user) {
         window.firebaseUser = user; 
         
-        // Tworzymy obiekt użytkownika dla modułu UI
+        // NAJPIERW ładujemy bazę danych z Firebase (aby usersList było pełne)
+        if (!dataLoaded && window.loadDataFromFirebase) {
+            await window.loadDataFromFirebase();
+            dataLoaded = true;
+        }
+
+        // Szukamy logującego się konta na Twojej głównej liście uprawnień
+        const dbUser = usersList.find(u => u.login.toLowerCase() === user.email.toLowerCase());
+
+        // Tworzymy obiekt użytkownika pobierając jego prawdziwe dane (Imię i Rola)
         currentUser = {
             login: user.email,
-            name: user.displayName || user.email.split('@')[0], 
-            role: 'admin', // Docelowo przypisz z bazy, teraz dajemy admina byś widział całą aplikację
-            allowedTabs: null,
+            name: dbUser ? dbUser.name : (user.displayName || user.email.split('@')[0]), 
+            role: dbUser ? dbUser.role : 'user', // Pobiera admin/user z bazy
+            allowedTabs: dbUser ? dbUser.allowedTabs : null,
             preferredTabs: null
         };
+
+        // Automatyczne wstrzykiwanie imienia w menu HTML
+        // Upewnij się, że masz w HTML np: <span id="loggedUserName"></span>
+        const nameElements = document.querySelectorAll('.logged-user-name, #loggedUserName, #currentUserNameDisplay');
+        nameElements.forEach(el => {
+            el.textContent = currentUser.name;
+        });
 
         // Aby zapobiec błędowi w store.js, wrzucamy go do listy użytkowników
         if (appUsers.length === 0) {
             appUsers.push(currentUser);
         }
 
-        // Twoja oryginalna logika ładowania bazy i obsługi UI
-        if (!dataLoaded && window.loadDataFromFirebase) {
-            await window.loadDataFromFirebase();
-            dataLoaded = true;
-        }
         if (window.handleUserAuthenticated) {
             window.handleUserAuthenticated(user);
         }
@@ -94,6 +106,11 @@ onAuthStateChanged(auth, async (user) => {
         window.firebaseUser = null;
         currentUser = null;
         dataLoaded = false;
+        
+        const nameElements = document.querySelectorAll('.logged-user-name, #loggedUserName, #currentUserNameDisplay');
+        nameElements.forEach(el => {
+            el.textContent = '';
+        });
         
         // POPRAWKA: wywołujemy funkcję bezpośrednio, nie szukając jej w window
         handleUserLoggedOut(); 
