@@ -100,6 +100,7 @@ export function updateAllStocks() {
                 rodzaj: isKorekta ? 'REMANENT' : (isUtylizacja ? 'UTYLIZACJA' : 'WYDANIE'), 
                 rawAmount: isKorekta ? r.amount : Math.abs(r.amount),
                 induscoIndex: idx, jednostka: '-', kalkulacja: '-',
+                author: r.author, // Przekazujemy autora do wydań/utylizacji
                 akcje: `<button onclick="editInduscoRecord(${idx})" class="text-[10px] font-bold border border-black px-2 py-1 bg-white hover:bg-gray-200 uppercase print-hide">EDYTUJ ZDARZ.</button>`
             });
         }
@@ -654,10 +655,14 @@ export function renderDailyLedger() {
             if (ev.isAccepted) {
                 calcDisplay += `<div class="mt-0.5 text-[9px] text-green-800 font-bold bg-green-100 border border-green-800 px-1 py-0.5 whitespace-nowrap">ZAAKCEPTOWANO</div>`;
             } else if (ev.rejectionComment) {
-                calcDisplay += `<div class="mt-0.5 text-[9px] text-red-800 font-bold bg-red-100 border border-red-800 px-1 py-0.5 whitespace-nowrap truncate max-w-[80px]" title="${escapeHTML(ev.rejectionComment)}">ODRZUCONO</div>`;
+                calcDisplay += `<div class="mt-0.5 text-[9px] text-red-800 font-bold bg-red-100 border border-red-800 px-1 py-0.5 whitespace-nowrap truncate max-w-[150px]" title="${escapeHTML(ev.rejectionComment)}">ODRZUCONO: ${escapeHTML(ev.rejectionComment)}</div>`;
             } else {
                 calcDisplay += `<div class="mt-0.5 text-[9px] text-orange-700 font-bold bg-orange-100 border border-orange-700 px-1 py-0.5 whitespace-nowrap">OCZEKUJE</div>`;
             }
+        } else if (ev.author) {
+            // Oczyszczamy HTML (np. usuwamy znaczniki edycji, żeby wyświetlić samo imię)
+            let cleanAuthor = ev.author.replace(/<[^>]*>?/gm, '');
+            calcDisplay = `<div class="text-[9px] text-gray-500 font-normal truncate max-w-[150px] uppercase" title="Wprowadził(a): ${escapeHTML(cleanAuthor)}">${escapeHTML(cleanAuthor)}</div>`;
         }
 
         html += `<tr class="hover:bg-gray-50">
