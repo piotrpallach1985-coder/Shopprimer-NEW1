@@ -369,6 +369,40 @@ export async function editHistoryItem(id, sourceTab = 'history') {
     if (window.calculate) window.calculate();
 }
 
+// Funkcja pomocnicza używana wewnętrznie do czyszczenia stanu UI po edycji
+export function cancelEditMode() {
+    window.editingProtocolId = null;
+    const btnCancel = document.getElementById('btnCancelEdit');
+    if (btnCancel) btnCancel.classList.add('hidden');
+}
+
+// Funkcja docelowo połączona z przyciskiem Anuluj (btnCancelEdit)
+export async function cancelEditProtocol() {
+    if (await window.customConfirm("Czy na pewno chcesz anulować edycję? Niezapisane zmiany zostaną utracone.")) {
+        cancelEditMode();
+
+        document.querySelectorAll('.print-protocol-number').forEach(el => el.textContent = "");
+        document.querySelectorAll('.print-project-name').forEach(el => el.textContent = "");
+        document.getElementById('protocolDateInput').valueAsDate = new Date();
+
+        if (window.tempInputData) { 
+            setInputData(window.tempInputData); 
+            window.tempInputData = null; 
+        } else { 
+            setInputData([]); 
+        }
+        
+        window.historicalRates = null;
+
+        if (window.clearAddForm) window.clearAddForm(); 
+        if (window.calculate) window.calculate(); 
+
+        const targetTab = window.sourceTabForPreview || 'history';
+        if (window.switchTab) window.switchTab(targetTab, true); 
+        window.sourceTabForPreview = null;
+    }
+}
+
 export function exitPreviewMode() {
     if (window.cancelEditMode) window.cancelEditMode(); 
     window.isPreviewMode = false; 
@@ -579,6 +613,8 @@ window.printProtocol = printProtocol;
 window.printHistoryProtocol = printHistoryProtocol;
 window.loadHistoryItem = loadHistoryItem;
 window.editHistoryItem = editHistoryItem;
+window.cancelEditProtocol = cancelEditProtocol; // <--- DODANA FUNKCJA
+window.cancelEditMode = cancelEditMode;         // <--- DODANA FUNKCJA
 window.exitPreviewMode = exitPreviewMode;
 window.acceptCurrentPreview = acceptCurrentPreview;
 window.rejectCurrentPreview = rejectCurrentPreview;
