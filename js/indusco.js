@@ -733,12 +733,20 @@ export function printDailyLedger() {
 
 export function changeDailyMonth(delta) {
     const input = document.getElementById('dailyMonthInput');
-    if (!input || !input.value) return;
-    let [y, m] = input.value.split('-').map(Number);
+    if (!input) return;
+    
+    let val = input.value;
+    if (!val) {
+        const now = new Date();
+        val = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    }
+    
+    let [y, m] = val.split('-').map(Number);
     m += delta;
     if (m < 1) { m = 12; y--; } else if (m > 12) { m = 1; y++; }
     input.value = `${y}-${String(m).padStart(2, '0')}`;
-    renderDailyLedger();
+    
+    if (window.renderDailyLedger) window.renderDailyLedger();
 }
 
 export function renderDailyLedger() {
@@ -758,23 +766,12 @@ export function renderDailyLedger() {
     const todayIso = dateToISO(new Date());
 
     let currentBalance = 0;
+    let eomBalance = 0;
     let sumDostawa = 0, sumUtylizacja = 0, sumZuzycie = 0, sumM2 = 0;
     let html = '';
+    let eventsInMonth = 0;
 
     events.forEach(ev => {
-        if (ev.dateObj.getFullYear() < year || (ev.dateObj.getFullYear() === year && ev.dateObj.getMonth() < month)) {
-            let valZuzycie = ev.zuzycie || 0;
-            if (ev.rodzaj === 'REMANENT') {
-                currentBalance = ev.rawAmount;
-            } else { 
-                currentBalance += (ev.wydanie || 0) - (ev.utylizacja || 0) - valZuzycie; 
-            }
-        }
-    });
-
-    const currentMonthEvents = events.filter(ev => ev.dateObj.getFullYear() === year && ev.dateObj.getMonth() === month);
-
-    currentMonthEvents.forEach(ev => {
         let valZuzycie = ev.zuzycie || 0;
 
         if (ev.rodzaj === 'REMANENT') {
@@ -786,68 +783,77 @@ export function renderDailyLedger() {
         }
         ev.pozostalo = currentBalance;
 
-        if (ev.rodzaj === 'REMANENT') {
-            sumZuzycie += valZuzycie; 
-        } else {
-            sumDostawa += ev.wydanie || 0; sumUtylizacja += ev.utylizacja || 0; sumZuzycie += valZuzycie; 
-        }
-        sumM2 += ev.m2 || 0;
-        
-        let zuzycieClass = "text-black"; let zuzycieText = "";
-        if (ev.rodzaj === 'REMANENT') {
-            zuzycieClass = valZuzycie > 0 ? "text-red-600" : "text-green-700";
-            zuzycieText = (valZuzycie > 0 ? "+" : "") + formatNumber(valZuzycie);
-        } else if (valZuzycie > 0) {
-            zuzycieClass = "text-blue-700"; zuzycieText = formatNumber(valZuzycie);
+        if (ev.dateObj.getFullYear() < year || (ev.dateObj.getFullYear() === year && ev.dateObj.getMonth() <= month)) {
+            eomBalance = currentBalance;
         }
 
-        let calcDisplay = ev.kalkulacja || '-';
-        if (ev.kalkulacja && ev.kalkulacja !== '-') {
-            if (ev.isAccepted) {
-                calcDisplay += `<div class="mt-0.5 text-[9px] text-green-800 font-bold bg-green-100 border border-green-800 px-1 py-0.5 whitespace-nowrap">ZAAKCEPTOWANO</div>`;
-            } else if (ev.rejectionComment) {
-                calcDisplay += `<div class="mt-0.5 text-[9px] text-red-800 font-bold bg-red-100 border border-red-800 px-1 py-0.5 whitespace-nowrap truncate max-w-[150px]" title="${escapeHTML(ev.rejectionComment)}">ODRZUCONO: ${escapeHTML(ev.rejectionComment)}</div>`;
+        const isCurrentMonth = ev.dateObj.getFullYear() === year && ev.dateObj.getMonth() === month;
+
+        if (isCurrentMonth) {
+            eventsInMonth++;
+            if (ev.rodzaj === 'REMANENT') {
+                sumZuzycie += valZuzycie; 
             } else {
-                calcDisplay += `<div class="mt-0.5 text-[9px] text-orange-700 font-bold bg-orange-100 border border-orange-700 px-1 py-0.5 whitespace-nowrap">OCZEKUJE</div>`;
+                sumDostawa += ev.wydanie || 0; sumUtylizacja += ev.utylizacja || 0; sumZuzycie += valZuzycie; 
             }
-        } else if (ev.author) {
-            let cleanAuthor = ev.author.replace(/<[^>]*>?/gm, '');
-            calcDisplay = `<div class="text-[9px] text-gray-500 font-normal truncate max-w-[150px] uppercase" title="Wprowadził(a): ${escapeHTML(cleanAuthor)}">${escapeHTML(cleanAuthor)}</div>`;
+            sumM2 += ev.m2 || 0;
             
-            if (ev.isAccepted) {
-                calcDisplay += `<div class="mt-0.5 text-[9px] text-green-800 font-bold bg-green-100 border border-green-800 px-1 py-0.5 whitespace-nowrap">ZAAKCEPTOWANO</div>`;
-            } else if (ev.rejectionComment) {
-                calcDisplay += `<div class="mt-0.5 text-[9px] text-red-800 font-bold bg-red-100 border border-red-800 px-1 py-0.5 whitespace-nowrap truncate max-w-[150px]" title="${escapeHTML(ev.rejectionComment)}">ODRZUCONO: ${escapeHTML(ev.rejectionComment)}</div>`;
-            } else {
-                calcDisplay += `<div class="mt-0.5 text-[9px] text-orange-700 font-bold bg-orange-100 border border-orange-700 px-1 py-0.5 whitespace-nowrap">OCZEKUJE</div>`;
+            let zuzycieClass = "text-black"; let zuzycieText = "";
+            if (ev.rodzaj === 'REMANENT') {
+                zuzycieClass = valZuzycie > 0 ? "text-red-600" : "text-green-700";
+                zuzycieText = (valZuzycie > 0 ? "+" : "") + formatNumber(valZuzycie);
+            } else if (valZuzycie > 0) {
+                zuzycieClass = "text-blue-700"; zuzycieText = formatNumber(valZuzycie);
             }
+
+            let calcDisplay = ev.kalkulacja || '-';
+            if (ev.kalkulacja && ev.kalkulacja !== '-') {
+                if (ev.isAccepted) {
+                    calcDisplay += `<div class="mt-0.5 text-[9px] text-green-800 font-bold bg-green-100 border border-green-800 px-1 py-0.5 whitespace-nowrap">ZAAKCEPTOWANO</div>`;
+                } else if (ev.rejectionComment) {
+                    calcDisplay += `<div class="mt-0.5 text-[9px] text-red-800 font-bold bg-red-100 border border-red-800 px-1 py-0.5 whitespace-nowrap truncate max-w-[150px]" title="${escapeHTML(ev.rejectionComment)}">ODRZUCONO: ${escapeHTML(ev.rejectionComment)}</div>`;
+                } else {
+                    calcDisplay += `<div class="mt-0.5 text-[9px] text-orange-700 font-bold bg-orange-100 border border-orange-700 px-1 py-0.5 whitespace-nowrap">OCZEKUJE</div>`;
+                }
+            } else if (ev.author) {
+                let cleanAuthor = ev.author.replace(/<[^>]*>?/gm, '');
+                calcDisplay = `<div class="text-[9px] text-gray-500 font-normal truncate max-w-[150px] uppercase" title="Wprowadził(a): ${escapeHTML(cleanAuthor)}">${escapeHTML(cleanAuthor)}</div>`;
+                
+                if (ev.isAccepted) {
+                    calcDisplay += `<div class="mt-0.5 text-[9px] text-green-800 font-bold bg-green-100 border border-green-800 px-1 py-0.5 whitespace-nowrap">ZAAKCEPTOWANO</div>`;
+                } else if (ev.rejectionComment) {
+                    calcDisplay += `<div class="mt-0.5 text-[9px] text-red-800 font-bold bg-red-100 border border-red-800 px-1 py-0.5 whitespace-nowrap truncate max-w-[150px]" title="${escapeHTML(ev.rejectionComment)}">ODRZUCONO: ${escapeHTML(ev.rejectionComment)}</div>`;
+                } else {
+                    calcDisplay += `<div class="mt-0.5 text-[9px] text-orange-700 font-bold bg-orange-100 border border-orange-700 px-1 py-0.5 whitespace-nowrap">OCZEKUJE</div>`;
+                }
+            }
+
+            const evDateIso = dateToISO(ev.dateObj);
+            const displayDate = formatISOToPL(evDateIso);
+            let rowClass = (evDateIso === todayIso) ? "bg-yellow-100 hover:bg-yellow-200 border-b border-yellow-300" : "hover:bg-gray-50 border-b border-gray-200 bg-white";
+
+            html += `<tr class="${rowClass}">
+                <td class="px-2 py-1 border-r border-black font-bold align-middle text-black">${displayDate}</td>
+                <td class="px-2 py-1 border-r border-black font-bold uppercase align-middle">${ev.jednostka || '-'}</td>
+                <td class="px-2 py-1 border-r border-black text-green-700 font-bold text-center align-middle">${ev.wydanie > 0 ? formatNumber(ev.wydanie) : ''}</td>
+                <td class="px-2 py-1 border-r border-black text-red-600 font-bold text-center align-middle">${ev.utylizacja > 0 ? formatNumber(ev.utylizacja) : ''}</td>
+                <td class="px-2 py-1 border-r border-black font-bold text-right px-2 ${zuzycieClass} align-middle">${zuzycieText}</td>
+                <td class="px-2 py-1 border-r border-black font-bold bg-yellow-50 text-black text-sm text-right px-2 align-middle">${formatNumber(ev.pozostalo)}</td>
+                <td class="px-2 py-1 border-r border-black text-blue-700 font-bold text-center align-middle">${ev.m2 > 0 ? formatNumber(ev.m2) : ''}</td>
+                <td class="px-2 py-1 border-r border-black text-gray-700 font-bold uppercase text-[10px] align-middle">${ev.rodzaj}</td>
+                <td class="px-2 py-1 border-r border-black text-gray-700 font-bold text-[10px] uppercase align-middle">${calcDisplay}</td>
+                <td class="px-2 py-1 border-b border-black text-center print-hide align-middle">${ev.akcje || '-'}</td>
+            </tr>`;
         }
-
-        const evDateIso = dateToISO(ev.dateObj);
-        const displayDate = formatISOToPL(evDateIso);
-        let rowClass = (evDateIso === todayIso) ? "bg-yellow-100 hover:bg-yellow-200 border-b border-yellow-300" : "hover:bg-gray-50 border-b border-gray-200 bg-white";
-
-        html += `<tr class="${rowClass}">
-            <td class="px-2 py-1 border-r border-black font-bold align-middle text-black">${displayDate}</td>
-            <td class="px-2 py-1 border-r border-black font-bold uppercase align-middle">${ev.jednostka || '-'}</td>
-            <td class="px-2 py-1 border-r border-black text-green-700 font-bold text-center align-middle">${ev.wydanie > 0 ? formatNumber(ev.wydanie) : ''}</td>
-            <td class="px-2 py-1 border-r border-black text-red-600 font-bold text-center align-middle">${ev.utylizacja > 0 ? formatNumber(ev.utylizacja) : ''}</td>
-            <td class="px-2 py-1 border-r border-black font-bold text-right px-2 ${zuzycieClass} align-middle">${zuzycieText}</td>
-            <td class="px-2 py-1 border-r border-black font-bold bg-yellow-50 text-black text-sm text-right px-2 align-middle">${formatNumber(ev.pozostalo)}</td>
-            <td class="px-2 py-1 border-r border-black text-blue-700 font-bold text-center align-middle">${ev.m2 > 0 ? formatNumber(ev.m2) : ''}</td>
-            <td class="px-2 py-1 border-r border-black text-gray-700 font-bold uppercase text-[10px] align-middle">${ev.rodzaj}</td>
-            <td class="px-2 py-1 border-r border-black text-gray-700 font-bold text-[10px] uppercase align-middle">${calcDisplay}</td>
-            <td class="px-2 py-1 border-b border-black text-center print-hide align-middle">${ev.akcje || '-'}</td>
-        </tr>`;
     });
 
-    if (currentMonthEvents.length === 0) {
+    if (eventsInMonth === 0) {
         tbody.innerHTML = `<tr><td colspan="10" class="p-6 font-bold uppercase text-gray-500 text-center">Brak zdarzeń w wybranym miesiącu.</td></tr>`;
     } else {
         tbody.innerHTML = html;
     }
 
-    tfoot.innerHTML = `<tr><td colspan="2" class="px-2 py-1.5 border-r border-black text-right uppercase text-black font-bold bg-gray-200">SUMA W MIESIĄCU:</td><td class="px-2 py-1.5 border-r border-black text-green-700 font-bold text-center bg-gray-200 text-sm">${formatNumber(sumDostawa)}</td><td class="px-2 py-1.5 border-r border-black text-red-600 font-bold text-center bg-gray-200 text-sm">${formatNumber(sumUtylizacja)}</td><td class="px-2 py-1.5 border-r border-black font-bold text-right px-2 bg-gray-200 text-blue-700 text-sm">${formatNumber(sumZuzycie)}</td><td class="px-2 py-1.5 border-r border-black font-bold bg-yellow-100 text-black text-right px-2 text-sm">${formatNumber(currentBalance)}</td><td class="px-2 py-1.5 border-r border-black text-blue-700 font-bold text-center bg-gray-200 text-sm">${formatNumber(sumM2)}</td><td colspan="3" class="px-2 py-1.5 bg-gray-200 border-black print-hide"></td></tr>`;
+    tfoot.innerHTML = `<tr><td colspan="2" class="px-2 py-1.5 border-r border-black text-right uppercase text-black font-bold bg-gray-200">SUMA W MIESIĄCU:</td><td class="px-2 py-1.5 border-r border-black text-green-700 font-bold text-center bg-gray-200 text-sm">${formatNumber(sumDostawa)}</td><td class="px-2 py-1.5 border-r border-black text-red-600 font-bold text-center bg-gray-200 text-sm">${formatNumber(sumUtylizacja)}</td><td class="px-2 py-1.5 border-r border-black font-bold text-right px-2 bg-gray-200 text-blue-700 text-sm">${formatNumber(sumZuzycie)}</td><td class="px-2 py-1.5 border-r border-black font-bold bg-yellow-100 text-black text-right px-2 text-sm">${formatNumber(eomBalance)}</td><td class="px-2 py-1.5 border-r border-black text-blue-700 font-bold text-center bg-gray-200 text-sm">${formatNumber(sumM2)}</td><td colspan="3" class="px-2 py-1.5 bg-gray-200 border-black print-hide"></td></tr>`;
 }
 
 export function renderDailyInduscoSidebar() {
