@@ -116,21 +116,24 @@ export function switchTab(tabId, bypassCheck = false) {
 export function applyUserPermissions() {
     if (!currentUser) return;
     
-    const allStandardTabs = AVAILABLE_TABS.map(t => t.id);
+    // Zawsze pobieramy najświeższe dane z bazy uprawnień dla aktualnie zalogowanego konta.
+    // Gwarantuje to poprawne załadowanie zablokowanych zakładek nawet po pełnym restarcie/przeładowaniu strony.
+    const dbUser = usersList.find(u => u.login === currentUser.login) || currentUser;
     
+    const allStandardTabs = AVAILABLE_TABS.map(t => t.id);
     let allowed = [];
     
-    if (currentUser.role === 'admin') {
+    if (dbUser.role === 'admin') {
         // Admin widzi wszystkie moduły ORAZ zakładkę z ustawieniami ("users")
         allowed = [...allStandardTabs, 'users'];
     } else {
         // Zwykły użytkownik widzi tylko to, co nadano mu w panelu (albo domyślne moduły)
-        allowed = currentUser.allowedTabs || allStandardTabs;
+        allowed = dbUser.allowedTabs || allStandardTabs;
         // Twarde usunięcie zakładki ustawień dla nie-adminów
         allowed = allowed.filter(t => t !== 'users'); 
     }
 
-    const readOnlyTabs = currentUser.role === 'admin' ? [] : (currentUser.readOnlyTabs || []);
+    const readOnlyTabs = dbUser.role === 'admin' ? [] : (dbUser.readOnlyTabs || []);
 
     const allPossibleTabs = [...allStandardTabs, 'users'];
 
@@ -149,7 +152,7 @@ export function applyUserPermissions() {
         }
     });
     
-    // Ustalanie aktywnej zakładki (żeby nie zostawić użytkownika na pustym ekranie)
+    // Ustalanie aktywnej zakładki (żeby nie zostawić użytkownika na pustym/zablokowanym ekranie)
     const activeViews = allPossibleTabs.filter(tab => {
         const v = document.getElementById('view-' + tab);
         return v && !v.classList.contains('hidden');
@@ -178,7 +181,7 @@ export function renderUserPreferences() {
 }
 
 export async function saveUserPreferences() {
-    // Pusta funkcja - nie jest już potrzebna, zapobiega potencjalnym błędom w logach.
+    // Pusta funkcja - nie jest już potrzebna, zapobiega potencjalnym błędom w logach po stronie HTML.
 }
 
 export function renderUsersTable() {
@@ -250,7 +253,7 @@ export async function saveEditUser() {
     u.name = document.getElementById('editUserName').value.trim();
     u.role = document.getElementById('editUserAdmin').checked ? 'admin' : 'user';
 
-    // Zbieramy zaznaczone uprawnienia do zakładek (tylko z dostepnych checkboxes)
+    // Zbieramy zaznaczone uprawnienia do zakładek (tylko z dostępnych pól wyboru)
     const checkboxes = document.querySelectorAll('.edit-user-tab-cb');
     if (checkboxes.length > 0) {
         u.allowedTabs = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
