@@ -301,7 +301,6 @@
                 <h1 class="text-xl md:text-2xl font-bold text-black flex items-center gap-2 uppercase tracking-wide">
                     SHOPPRIMER <span class="bg-black text-white px-2 py-0.5 text-sm ml-2">WEB v.2.1 TEST</span>
                     <span id="welcomeMessage" class="hidden text-sm font-normal normal-case text-gray-600 ml-2 print-hide">
-                        <!-- POPRAWKA: Użycie właściwego ID -->
                         WITAJ: <span id="loggedUserName" class="font-bold text-black uppercase"></span>
                     </span>
                 </h1>
@@ -324,7 +323,7 @@
             </div>
         </header>
 
-        <!-- ZAKŁADKI - POPRAWKA: dodano sticky top-0 bg-white z-50 -->
+        <!-- ZAKŁADKI -->
         <div class="flex flex-wrap items-end space-x-1 border-b-2 border-black mt-2 print-hide px-1 gap-y-1 relative sticky top-0 bg-white z-50 pt-2 pb-1" id="mainTabsContainer">
             <button id="tab-daily" onclick="switchTab('daily')" class="px-2 py-1.5 border-2 border-black border-b-0 bg-white text-black text-xs font-bold focus:outline-none whitespace-nowrap z-10">
                 ROZLICZENIE DZIENNE
@@ -505,10 +504,13 @@
             <!-- Monthly Comparison (Charts) -->
             <div class="bg-white p-4 border border-black mt-4 print-hide">
                 <h2 class="text-sm font-bold text-black mb-3 border-b border-black pb-1 uppercase">Porównanie miesięczne - Wykresy</h2>
-                <div class="mb-4 w-full sm:w-48">
+                
+                <!-- POPRAWKA: Ukryty wybór daty dla wykresów -->
+                <div class="mb-4 w-full sm:w-48 hidden">
                     <label class="block text-xs font-bold text-black mb-1 uppercase">Wybierz miesiąc</label>
                     <input type="month" id="compareMonthDate" onchange="renderMonthlyCompareCharts()" class="w-full border border-black p-1.5 text-sm outline-none bg-yellow-50 focus:bg-white font-bold cursor-pointer hover:bg-gray-100">
                 </div>
+                
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     <div class="border border-black p-2 bg-gray-50 h-80 w-full relative">
                         <canvas id="chartM2"></canvas>
