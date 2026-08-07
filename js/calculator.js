@@ -122,18 +122,44 @@ export async function updateDbMultiplier(cat, key, value) {
     }
 }
 
+export async function removeDbItem(cat, key) {
+    const pin = await window.customPrompt("Podaj kod autoryzacji (PIN), aby usunąć profil z bazy:", 'password');
+    if (pin === "4321") {
+        if (database[cat] && database[cat][key] !== undefined) {
+            delete database[cat][key];
+            window.forceNextCloudOverwrite = true;
+            renderDbTable(); 
+            updateProfilSelect(); 
+            calculate(); 
+            autoSaveToDisk(true);
+            await window.customAlert(`Profil ${key} został usunięty.`);
+        }
+    } else if (pin !== null) {
+        await window.customAlert("Nieprawidłowy kod PIN.");
+    }
+}
+
 export function renderDbTable() {
     const previewSection = document.getElementById('dbPreviewSection');
     const tbody = document.getElementById('dbTableBody');
     const countBadge = document.getElementById('dbCountBadge');
+    
+    // Filtrowanie z UI
     const searchInput = document.getElementById('dbSearchInput');
     const query = searchInput ? searchInput.value.toLowerCase() : "";
+    
+    const catFilterSelect = document.getElementById('dbFilterKategoria');
+    const selectedCategory = catFilterSelect ? catFilterSelect.value : "";
     
     let html = '';
     let totalCount = 0; let totalInDb = 0;
     
     for (const cat in database) {
         if (cat === 'Płaskowniki FB') continue; 
+        
+        // Filtrowanie po wybranej kategorii
+        if (selectedCategory && cat !== selectedCategory) continue;
+
         const keys = Object.keys(database[cat]).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
         totalInDb += keys.length;
         if (keys.length === 0) continue;
@@ -141,16 +167,23 @@ export function renderDbTable() {
         const filteredKeys = keys.filter(k => k.toLowerCase().includes(query));
         if (filteredKeys.length === 0) continue;
         
-        html += `<tr><td colspan="2" class="font-bold uppercase tracking-wider text-[11px] bg-gray-100 text-black px-3 py-2 border-b border-black">${cat}</td></tr>`;
+        html += `<tr><td colspan="3" class="font-bold uppercase tracking-wider text-[11px] bg-gray-100 text-black px-3 py-2 border-b border-black">${cat}</td></tr>`;
         
         filteredKeys.forEach(key => {
             totalCount++;
+            // Używamy escapeHTML dla key, aby bezpiecznie wyrenderować je w funkcji JS wewnątrz HTML
+            const safeCat = escapeHTML(cat);
+            const safeKey = escapeHTML(key);
+            
             html += `
                 <tr class="hover:bg-gray-100 transition-colors">
                     <td class="pl-6 font-bold text-black px-3 py-1.5 border-b border-gray-300">${key}</td>
-                    <td class="text-right px-3 py-1.5 border-b border-gray-300">
+                    <td class="text-right px-3 py-1.5 border-b border-gray-300 border-r border-gray-300">
                         <input type="text" value="${formatNumber(database[cat][key], 4)}" 
-                            onchange="updateDbMultiplier('${cat}', '${key}', this.value)" class="w-24 text-right bg-transparent focus:bg-white border border-transparent hover:border-black focus:border-black outline-none text-black font-bold px-1 py-0.5 transition-all">
+                            onchange="updateDbMultiplier('${safeCat}', '${safeKey}', this.value)" class="w-24 text-right bg-transparent focus:bg-white border border-transparent hover:border-black focus:border-black outline-none text-black font-bold px-1 py-0.5 transition-all">
+                    </td>
+                    <td class="text-center px-3 py-1.5 border-b border-gray-300">
+                        <button onclick="removeDbItem('${safeCat}', '${safeKey}')" class="text-white bg-red-600 font-bold uppercase text-[10px] border border-black px-2 py-0.5 hover:bg-red-700 leading-none shadow-sm transition-colors">Usuń</button>
                     </td>
                 </tr>
             `;
@@ -159,8 +192,8 @@ export function renderDbTable() {
     if (tbody) tbody.innerHTML = html;
     if (countBadge) countBadge.textContent = totalCount;
     if (previewSection) {
-        if (totalInDb > 0) { previewSection.classList.remove('hidden'); previewSection.classList.add('flex'); } 
-        else { previewSection.classList.add('hidden'); previewSection.classList.remove('flex'); }
+        // Zawsze pokazujemy sekcję, żeby można było używać filtrów (nawet jeśli totalInDb wyniesie chwilowo 0 przez filtry)
+        previewSection.classList.remove('hidden'); previewSection.classList.add('flex');
     }
     updateProfilSelect();
 
@@ -779,6 +812,7 @@ window.updateProfilSelect = updateProfilSelect;
 window.filterDbTable = filterDbTable;
 window.addManualDbItem = addManualDbItem;
 window.updateDbMultiplier = updateDbMultiplier;
+window.removeDbItem = removeDbItem; // Dodane nowe podpięcie
 window.renderDbTable = renderDbTable;
 
 window.getShopprimerColor = getShopprimerColor;
