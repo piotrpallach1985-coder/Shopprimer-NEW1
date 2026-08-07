@@ -99,10 +99,8 @@ export function updateAllStocks() {
             
             if (!r.isAccepted) {
                 if (r.rejectionComment) {
-                    // ZMIANA: Przekazujemy idx zamiast r.id
                     btnAkcje += `<button onclick="acceptInduscoRecord(${idx})" class="text-white bg-green-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-green-700 leading-none">Zatwierdź</button>`;
                 } else {
-                    // ZMIANA: Przekazujemy idx zamiast r.id
                     btnAkcje += `<button onclick="acceptInduscoRecord(${idx})" class="text-white bg-green-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-green-700 leading-none">Akceptuj</button>`;
                     btnAkcje += `<button onclick="rejectInduscoRecord(${idx})" class="text-white bg-red-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-red-700 leading-none">Odrzuć</button>`;
                 }
@@ -337,7 +335,6 @@ export function renderInduscoTable() {
             
             if (!row.isAccepted) {
                 if (row.rejectionComment) {
-                     // ZMIANA: Szukamy po indeksie (i)
                      akcjeHtml += `<button onclick="acceptInduscoRecord(${i})" class="w-full text-white bg-green-600 font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-green-700 leading-none">Zatwierdź</button>`;
                 } else {
                      akcjeHtml += `<button onclick="acceptInduscoRecord(${i})" class="w-full text-white bg-green-600 font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-green-700 leading-none">Akceptuj</button>`;
@@ -429,23 +426,22 @@ export async function saveBulkIndusco() {
     } else await window.customAlert("Nie dodano żadnych wpisów. Upewnij się, że wpisane ilości są prawidłowe.");
 }
 
-// ZMIANA: Szuka po indeksie, co gwarantuje znalezienie starych rekordów bez pola ID
+// BEZPOŚREDNIA MUTACJA TABLICY
 export async function acceptInduscoRecord(index) {
     if (index === undefined || index < 0 || index >= induscoHistory.length) return;
     
     if (await window.customConfirm("Czy na pewno chcesz potwierdzić ten wpis w magazynie?")) {
         window.forceNextCloudOverwrite = true;
-        const newHistory = [...induscoHistory];
-        newHistory[index] = {
-            ...newHistory[index],
-            isAccepted: true,
-            acceptedBy: currentUser ? (currentUser.name || currentUser.login) : "System",
-            rejectionComment: null,
-            rejectedBy: null,
-            lastModified: Date.now()
-        };
-        if (window.setInduscoHistory) window.setInduscoHistory(newHistory);
+        
+        induscoHistory[index].isAccepted = true;
+        induscoHistory[index].acceptedBy = currentUser ? (currentUser.name || currentUser.login) : "System";
+        induscoHistory[index].rejectionComment = null;
+        induscoHistory[index].rejectedBy = null;
+        induscoHistory[index].lastModified = Date.now();
+        
+        if (window.setInduscoHistory) window.setInduscoHistory(induscoHistory);
         autoSaveToDisk(true);
+        
         renderInduscoTable();
         if (document.getElementById('view-daily') && document.getElementById('view-daily').classList.contains('block')) { 
             renderDailySidebar(); renderDailyLedger(); 
@@ -454,24 +450,23 @@ export async function acceptInduscoRecord(index) {
     }
 }
 
-// ZMIANA: Szuka po indeksie, co gwarantuje znalezienie starych rekordów bez pola ID
+// BEZPOŚREDNIA MUTACJA TABLICY
 export async function rejectInduscoRecord(index) {
     if (index === undefined || index < 0 || index >= induscoHistory.length) return;
     
     const comment = await window.customPrompt("Podaj powód odrzucenia:", "text");
     if (comment !== null && comment.trim() !== "") {
         window.forceNextCloudOverwrite = true;
-        const newHistory = [...induscoHistory];
-        newHistory[index] = {
-            ...newHistory[index],
-            isAccepted: false,
-            acceptedBy: null,
-            rejectionComment: comment.trim(),
-            rejectedBy: currentUser ? (currentUser.name || currentUser.login) : "System",
-            lastModified: Date.now()
-        };
-        if (window.setInduscoHistory) window.setInduscoHistory(newHistory);
+        
+        induscoHistory[index].isAccepted = false;
+        induscoHistory[index].acceptedBy = null;
+        induscoHistory[index].rejectionComment = comment.trim();
+        induscoHistory[index].rejectedBy = currentUser ? (currentUser.name || currentUser.login) : "System";
+        induscoHistory[index].lastModified = Date.now();
+        
+        if (window.setInduscoHistory) window.setInduscoHistory(induscoHistory);
         autoSaveToDisk(true);
+        
         renderInduscoTable();
         if (document.getElementById('view-daily') && document.getElementById('view-daily').classList.contains('block')) { 
             renderDailySidebar(); renderDailyLedger(); 
