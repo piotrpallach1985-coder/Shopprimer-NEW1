@@ -117,13 +117,23 @@ export function updateAllStocks() {
         Object.entries(p.brandStats).forEach(([brand, stat]) => {
             if (stat.thinner > 0) {
                 const pName = `${brand} - Rozcieńczalnik`;
-                if (calcEvents[pName]) calcEvents[pName].push({ dateObj, wydanie: 0, utylizacja: 0, zuzycie: stat.thinner, rodzaj: rodzajDisplay, jednostka: p.projectName || p.unit || '-', kalkulacja: p.protocolNumber || '-', m2: p.area || 0, akcje: `<button onclick="loadHistoryItem('${p.id}', 'daily')" class="text-[10px] font-bold bg-[#6466f1] text-white border border-black px-2 py-1 uppercase hover:bg-blue-800 print-hide">PODGLĄD</button>` });
+                if (calcEvents[pName]) calcEvents[pName].push({ 
+                    dateObj, wydanie: 0, utylizacja: 0, zuzycie: stat.thinner, rodzaj: rodzajDisplay, 
+                    jednostka: p.projectName || p.unit || '-', kalkulacja: p.protocolNumber || '-', 
+                    m2: p.area || 0, isAccepted: p.isAccepted, acceptedBy: p.acceptedBy, rejectionComment: p.rejectionComment, rejectedBy: p.rejectedBy,
+                    akcje: `<button onclick="loadHistoryItem('${p.id}', 'daily')" class="text-[10px] font-bold bg-[#6466f1] text-white border border-black px-2 py-1 uppercase hover:bg-blue-800 print-hide">PODGLĄD</button>` 
+                });
             }
             if (stat.colors) {
                 Object.entries(stat.colors).forEach(([color, vol]) => {
                     if (vol > 0) {
                         const pName = `${brand} - ${color}`;
-                        if (calcEvents[pName]) calcEvents[pName].push({ dateObj, wydanie: 0, utylizacja: 0, zuzycie: vol, rodzaj: rodzajDisplay, jednostka: p.projectName || p.unit || '-', kalkulacja: p.protocolNumber || '-', m2: p.area || 0, akcje: `<button onclick="loadHistoryItem('${p.id}', 'daily')" class="text-[10px] font-bold bg-[#6466f1] text-white border border-black px-2 py-1 uppercase hover:bg-blue-800 print-hide">PODGLĄD</button>` });
+                        if (calcEvents[pName]) calcEvents[pName].push({ 
+                            dateObj, wydanie: 0, utylizacja: 0, zuzycie: vol, rodzaj: rodzajDisplay, 
+                            jednostka: p.projectName || p.unit || '-', kalkulacja: p.protocolNumber || '-', 
+                            m2: p.area || 0, isAccepted: p.isAccepted, acceptedBy: p.acceptedBy, rejectionComment: p.rejectionComment, rejectedBy: p.rejectedBy,
+                            akcje: `<button onclick="loadHistoryItem('${p.id}', 'daily')" class="text-[10px] font-bold bg-[#6466f1] text-white border border-black px-2 py-1 uppercase hover:bg-blue-800 print-hide">PODGLĄD</button>` 
+                        });
                     }
                 });
             }
@@ -498,7 +508,6 @@ export function renderNotificationsList() {
 
     let html = '';
 
-    // 1. Alerty remanentowe
     if (activeRemanentAlerts && activeRemanentAlerts.length > 0) {
         activeRemanentAlerts.forEach(alert => {
             html += `
@@ -513,7 +522,6 @@ export function renderNotificationsList() {
         });
     }
 
-    // 2. Alerty ujemnego stanu magazynowego
     if (window.currentNegativeAlerts && window.currentNegativeAlerts.length > 0) {
         window.currentNegativeAlerts.forEach(neg => {
             html += `
@@ -528,7 +536,6 @@ export function renderNotificationsList() {
         });
     }
 
-    // 3. Aktywne zapotrzebowania Indusco
     if (activeInduscoRequests && activeInduscoRequests.length > 0) {
         activeInduscoRequests.forEach(req => {
             html += `
@@ -642,6 +649,17 @@ export function renderDailyLedger() {
             zuzycieClass = "text-blue-700"; zuzycieText = formatNumber(valZuzycie);
         }
 
+        let calcDisplay = ev.kalkulacja || '-';
+        if (ev.kalkulacja && ev.kalkulacja !== '-') {
+            if (ev.isAccepted) {
+                calcDisplay += `<div class="mt-0.5 text-[9px] text-green-800 font-bold bg-green-100 border border-green-800 px-1 py-0.5 whitespace-nowrap">ZAAKCEPTOWANO</div>`;
+            } else if (ev.rejectionComment) {
+                calcDisplay += `<div class="mt-0.5 text-[9px] text-red-800 font-bold bg-red-100 border border-red-800 px-1 py-0.5 whitespace-nowrap truncate max-w-[80px]" title="${escapeHTML(ev.rejectionComment)}">ODRZUCONO</div>`;
+            } else {
+                calcDisplay += `<div class="mt-0.5 text-[9px] text-orange-700 font-bold bg-orange-100 border border-orange-700 px-1 py-0.5 whitespace-nowrap">OCZEKUJE</div>`;
+            }
+        }
+
         html += `<tr class="hover:bg-gray-50">
             <td class="px-2 py-1 border-r border-b border-black font-bold text-black">${formatISOToPL(dateToISO(ev.dateObj))}</td>
             <td class="px-2 py-1 border-r border-b border-black font-bold uppercase">${ev.jednostka || '-'}</td>
@@ -651,7 +669,7 @@ export function renderDailyLedger() {
             <td class="px-2 py-1 border-r border-b border-black font-bold bg-yellow-50 text-black text-sm">${formatNumber(ev.pozostalo)}</td>
             <td class="px-2 py-1 border-r border-b border-black text-blue-700 font-bold">${ev.m2 > 0 ? formatNumber(ev.m2) : ''}</td>
             <td class="px-2 py-1 border-r border-b border-black text-gray-700 font-bold uppercase text-[10px]">${ev.rodzaj}</td>
-            <td class="px-2 py-1 border-r border-b border-black text-gray-700 font-bold text-[10px] uppercase">${ev.kalkulacja || '-'}</td>
+            <td class="px-2 py-1 border-r border-b border-black text-gray-700 font-bold text-[10px] uppercase">${calcDisplay}</td>
             <td class="px-2 py-1 border-b border-black text-center print-hide">${ev.akcje || '-'}</td>
         </tr>`;
     });
