@@ -93,6 +93,20 @@ export function updateAllStocks() {
         if (baseEvents[r.paintType]) {
             let isUtylizacja = r.actionType === 'utylizacja' || (r.amount < 0 && !r.isRemanent && r.actionType !== 'remanent'); 
             let isKorekta = r.isRemanent || r.actionType === 'remanent';
+            
+            let btnAkcje = `<div class="flex flex-col gap-1 items-stretch w-16 mx-auto print-hide">`;
+            btnAkcje += `<button onclick="editInduscoRecord(${idx})" class="text-[10px] font-bold border border-black px-1 py-0.5 bg-white hover:bg-gray-200 uppercase leading-none">EDYTUJ</button>`;
+            
+            if (!r.isAccepted) {
+                if (r.rejectionComment) {
+                    btnAkcje += `<button onclick="acceptInduscoRecord('${r.id}')" class="text-white bg-green-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-green-700 leading-none">Zatwierdź</button>`;
+                } else {
+                    btnAkcje += `<button onclick="acceptInduscoRecord('${r.id}')" class="text-white bg-green-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-green-700 leading-none">Akceptuj</button>`;
+                    btnAkcje += `<button onclick="rejectInduscoRecord('${r.id}')" class="text-white bg-red-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-red-700 leading-none">Odrzuć</button>`;
+                }
+            }
+            btnAkcje += `</div>`;
+
             baseEvents[r.paintType].push({ 
                 dateObj: parsePlDate(r.date), 
                 wydanie: (r.amount > 0 && !isKorekta) ? r.amount : 0, 
@@ -100,8 +114,9 @@ export function updateAllStocks() {
                 rodzaj: isKorekta ? 'REMANENT' : (isUtylizacja ? 'UTYLIZACJA' : 'WYDANIE'), 
                 rawAmount: isKorekta ? r.amount : Math.abs(r.amount),
                 induscoIndex: idx, jednostka: '-', kalkulacja: '-',
-                author: r.author, // Przekazujemy autora do wydań/utylizacji
-                akcje: `<button onclick="editInduscoRecord(${idx})" class="text-[10px] font-bold border border-black px-2 py-1 bg-white hover:bg-gray-200 uppercase print-hide">EDYTUJ ZDARZ.</button>`
+                author: r.author,
+                isAccepted: r.isAccepted, acceptedBy: r.acceptedBy, rejectionComment: r.rejectionComment, rejectedBy: r.rejectedBy,
+                akcje: btnAkcje
             });
         }
     });
@@ -250,10 +265,21 @@ export function updateAllStocks() {
 export function renderInduscoTable() {
     updateAllStocks();
     const tbody = document.getElementById('induscoTableBody');
+    let theadTr = document.querySelector('#view-indusco table thead tr');
+    
+    if (theadTr) {
+        theadTr.innerHTML = `
+            <th class="px-3 py-2 border-r border-black">Data Zdarzenia</th>
+            <th class="px-3 py-2 border-r border-black">Towar</th>
+            <th class="px-3 py-2 border-r border-black text-right">Ilość [L]</th>
+            <th class="px-3 py-2 border-r border-black">Akcja</th>
+            <th class="px-3 py-2 border-r border-black">Autor & Akceptacja</th>
+            <th id="colInduscoAction" class="px-3 py-2 text-center print-hide">Akcja</th>
+        `;
+    }
+
     if (!tbody) return; tbody.innerHTML = '';
     const isAdmin = currentUser && currentUser.role === 'admin';
-    const colAction = document.getElementById('colInduscoAction');
-    if (colAction) colAction.style.display = 'table-cell'; 
 
     const fDateFromStr = document.getElementById('induscoFilterDateFrom') ? document.getElementById('induscoFilterDateFrom').value : '';
     const fDateToStr = document.getElementById('induscoFilterDateTo') ? document.getElementById('induscoFilterDateTo').value : '';
@@ -295,15 +321,40 @@ export function renderInduscoTable() {
                 amountDisplay = formatNumber(Math.abs(row.amount), 2);
             }
 
+            let authorHtml = `<div class="whitespace-normal text-[10px]">${row.author ? row.author.replace(/<[^>]*>?/gm, '') : '-'}</div>`;
+            if (row.isAccepted) {
+                authorHtml += `<div class="mt-1 text-[9px] text-green-700 font-bold uppercase border-t border-green-300 pt-0.5">ZAAKCEPTOWAŁ(A):<br>${escapeHTML(row.acceptedBy)}</div>`;
+            } else if (row.rejectionComment) {
+                authorHtml += `<div class="mt-1 text-[9px] text-red-700 font-bold border-t border-red-300 pt-0.5" title="${escapeHTML(row.rejectionComment)}"><span class="uppercase">ODRZUCONO:</span><br><span class="font-normal italic">${escapeHTML(row.rejectionComment)}</span></div>`;
+            } else {
+                authorHtml += `<div class="mt-1 text-[9px] text-orange-600 font-bold uppercase border-t border-orange-300 pt-0.5">OCZEKUJE</div>`;
+            }
+
+            let akcjeHtml = `<div class="flex flex-col gap-1 items-center w-16 mx-auto">`;
+            akcjeHtml += `<button onclick="editInduscoRecord(${i})" class="w-full text-white bg-blue-600 font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-blue-800 leading-none">Edytuj</button>`;
+            
+            if (!row.isAccepted) {
+                if (row.rejectionComment) {
+                     akcjeHtml += `<button onclick="acceptInduscoRecord('${row.id}')" class="w-full text-white bg-green-600 font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-green-700 leading-none">Zatwierdź</button>`;
+                } else {
+                     akcjeHtml += `<button onclick="acceptInduscoRecord('${row.id}')" class="w-full text-white bg-green-600 font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-green-700 leading-none">Akceptuj</button>`;
+                     akcjeHtml += `<button onclick="rejectInduscoRecord('${row.id}')" class="w-full text-white bg-red-600 font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-red-700 leading-none">Odrzuć</button>`;
+                }
+            }
+            if (isAdmin) {
+                akcjeHtml += `<button onclick="removeInduscoRecord(${i})" class="w-full text-black font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-black hover:text-white bg-white leading-none">Usuń</button>`;
+            }
+            akcjeHtml += `</div>`;
+
             html += `
                 <tr class="${trClass}">
-                    <td class="px-3 py-2 border-r border-black font-bold text-black">${row.date}</td>
-                    <td class="px-3 py-2 border-r border-black text-black uppercase flex items-center">${typeDisplay}</td>
-                    <td class="px-3 py-2 border-r border-black text-right font-bold text-black">${amountDisplay}</td>
-                    <td class="px-3 py-2 border-r border-black font-bold ${akcjaColor} uppercase text-[10px]">${akcjaDisplay}</td>
-                    <td class="px-3 py-2 border-r border-black text-black text-xs whitespace-normal">${row.author}</td>
-                    <td class="px-3 py-2 text-center print-hide border-black">
-                        <div class="flex flex-col gap-1 items-center w-16 mx-auto"><button onclick="editInduscoRecord(${i})" class="w-full text-white bg-blue-600 font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-blue-800 leading-none">Edytuj</button>${isAdmin ? `<button onclick="removeInduscoRecord(${i})" class="w-full text-black font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-black hover:text-white bg-white leading-none">Usuń</button>` : ''}</div>
+                    <td class="px-3 py-2 border-r border-black font-bold text-black align-middle">${row.date}</td>
+                    <td class="px-3 py-2 border-r border-black text-black uppercase flex items-center align-middle">${typeDisplay}</td>
+                    <td class="px-3 py-2 border-r border-black text-right font-bold text-black align-middle">${amountDisplay}</td>
+                    <td class="px-3 py-2 border-r border-black font-bold ${akcjaColor} uppercase text-[10px] align-middle">${akcjaDisplay}</td>
+                    <td class="px-3 py-2 border-r border-black text-black text-xs whitespace-normal align-middle">${authorHtml}</td>
+                    <td class="px-3 py-2 text-center print-hide border-black align-middle">
+                        ${akcjeHtml}
                     </td>
                 </tr>
             `;
@@ -339,7 +390,20 @@ export async function saveBulkIndusco() {
                 if (actionType === 'utylizacja') finalAmount = -Math.abs(amount);
                 else if (actionType === 'wydanie') finalAmount = Math.abs(amount);
                 
-                induscoHistory.push({ id: 'ind_' + Date.now() + Math.random().toString(36).substr(2, 5), paintType, amount: finalAmount, actionType: actionType, isRemanent: isRem, date: dateStr, author: currentUser ? (currentUser.name || currentUser.login) : "Nieznany", lastModified: Date.now() });
+                induscoHistory.push({ 
+                    id: 'ind_' + Date.now() + Math.random().toString(36).substr(2, 5), 
+                    paintType, 
+                    amount: finalAmount, 
+                    actionType: actionType, 
+                    isRemanent: isRem, 
+                    date: dateStr, 
+                    author: currentUser ? (currentUser.name || currentUser.login) : "Nieznany", 
+                    lastModified: Date.now(),
+                    isAccepted: false,
+                    acceptedBy: null,
+                    rejectionComment: null,
+                    rejectedBy: null
+                });
                 
                 if (isRem) {
                     localAlerts.push({ id: Date.now().toString() + Math.random().toString(36).substr(2, 5), date: dateStr, paintType: paintType, author: currentUser ? (currentUser.name || currentUser.login) : "Nieznany" });
@@ -360,6 +424,57 @@ export async function saveBulkIndusco() {
         autoSaveToDisk(); await window.customAlert(`Pomyślnie zapisano ${addedCount} pozycji.`);
         document.getElementById('induscoBulkRows').innerHTML = ''; addInduscoBulkRow(); 
     } else await window.customAlert("Nie dodano żadnych wpisów. Upewnij się, że wpisane ilości są prawidłowe.");
+}
+
+export async function acceptInduscoRecord(id) {
+    const index = induscoHistory.findIndex(r => r.id === id);
+    if (index === -1) return;
+    if (await window.customConfirm("Czy na pewno chcesz potwierdzić ten wpis w magazynie?")) {
+        window.forceNextCloudOverwrite = true;
+        const newHistory = [...induscoHistory];
+        newHistory[index] = {
+            ...newHistory[index],
+            isAccepted: true,
+            acceptedBy: currentUser ? (currentUser.name || currentUser.login) : "System",
+            rejectionComment: null,
+            rejectedBy: null,
+            lastModified: Date.now()
+        };
+        if (window.setInduscoHistory) window.setInduscoHistory(newHistory);
+        autoSaveToDisk(true);
+        renderInduscoTable();
+        if (document.getElementById('view-daily') && document.getElementById('view-daily').classList.contains('block')) { 
+            renderDailySidebar(); renderDailyLedger(); 
+        }
+        await window.customAlert("Wpis został pomyślnie zaakceptowany.");
+    }
+}
+
+export async function rejectInduscoRecord(id) {
+    const index = induscoHistory.findIndex(r => r.id === id);
+    if (index === -1) return;
+    const comment = await window.customPrompt("Podaj powód odrzucenia:", "text");
+    if (comment !== null && comment.trim() !== "") {
+        window.forceNextCloudOverwrite = true;
+        const newHistory = [...induscoHistory];
+        newHistory[index] = {
+            ...newHistory[index],
+            isAccepted: false,
+            acceptedBy: null,
+            rejectionComment: comment.trim(),
+            rejectedBy: currentUser ? (currentUser.name || currentUser.login) : "System",
+            lastModified: Date.now()
+        };
+        if (window.setInduscoHistory) window.setInduscoHistory(newHistory);
+        autoSaveToDisk(true);
+        renderInduscoTable();
+        if (document.getElementById('view-daily') && document.getElementById('view-daily').classList.contains('block')) { 
+            renderDailySidebar(); renderDailyLedger(); 
+        }
+        await window.customAlert("Wpis został odrzucony.");
+    } else if (comment !== null) {
+        await window.customAlert("Komentarz do odrzucenia nie może być pusty!");
+    }
 }
 
 export async function removeInduscoRecord(index) {
@@ -420,6 +535,12 @@ export async function saveEditIndusco() {
     induscoHistory[index].date = formatISOToPL(dIso); induscoHistory[index].paintType = type;
     induscoHistory[index].actionType = actionType; induscoHistory[index].isRemanent = isRem;
     induscoHistory[index].amount = finalAmt; induscoHistory[index].author = (induscoHistory[index].author || "") + editInfo;
+    
+    // Reset statusu akceptacji po edycji!
+    induscoHistory[index].isAccepted = false;
+    induscoHistory[index].acceptedBy = null;
+    induscoHistory[index].rejectionComment = null;
+    induscoHistory[index].rejectedBy = null;
     induscoHistory[index].lastModified = Date.now();
 
     let localAlerts = [...activeRemanentAlerts];
@@ -660,22 +781,29 @@ export function renderDailyLedger() {
                 calcDisplay += `<div class="mt-0.5 text-[9px] text-orange-700 font-bold bg-orange-100 border border-orange-700 px-1 py-0.5 whitespace-nowrap">OCZEKUJE</div>`;
             }
         } else if (ev.author) {
-            // Oczyszczamy HTML (np. usuwamy znaczniki edycji, żeby wyświetlić samo imię)
             let cleanAuthor = ev.author.replace(/<[^>]*>?/gm, '');
             calcDisplay = `<div class="text-[9px] text-gray-500 font-normal truncate max-w-[150px] uppercase" title="Wprowadził(a): ${escapeHTML(cleanAuthor)}">${escapeHTML(cleanAuthor)}</div>`;
+            
+            if (ev.isAccepted) {
+                calcDisplay += `<div class="mt-0.5 text-[9px] text-green-800 font-bold bg-green-100 border border-green-800 px-1 py-0.5 whitespace-nowrap">ZAAKCEPTOWANO</div>`;
+            } else if (ev.rejectionComment) {
+                calcDisplay += `<div class="mt-0.5 text-[9px] text-red-800 font-bold bg-red-100 border border-red-800 px-1 py-0.5 whitespace-nowrap truncate max-w-[150px]" title="${escapeHTML(ev.rejectionComment)}">ODRZUCONO: ${escapeHTML(ev.rejectionComment)}</div>`;
+            } else {
+                calcDisplay += `<div class="mt-0.5 text-[9px] text-orange-700 font-bold bg-orange-100 border border-orange-700 px-1 py-0.5 whitespace-nowrap">OCZEKUJE</div>`;
+            }
         }
 
         html += `<tr class="hover:bg-gray-50">
-            <td class="px-2 py-1 border-r border-b border-black font-bold text-black">${formatISOToPL(dateToISO(ev.dateObj))}</td>
-            <td class="px-2 py-1 border-r border-b border-black font-bold uppercase">${ev.jednostka || '-'}</td>
-            <td class="px-2 py-1 border-r border-b border-black text-green-700 font-bold">${ev.wydanie > 0 ? formatNumber(ev.wydanie) : ''}</td>
-            <td class="px-2 py-1 border-r border-b border-black text-red-600 font-bold">${ev.utylizacja > 0 ? formatNumber(ev.utylizacja) : ''}</td>
-            <td class="px-2 py-1 border-r border-b border-black font-bold ${zuzycieClass}">${zuzycieText}</td>
-            <td class="px-2 py-1 border-r border-b border-black font-bold bg-yellow-50 text-black text-sm">${formatNumber(ev.pozostalo)}</td>
-            <td class="px-2 py-1 border-r border-b border-black text-blue-700 font-bold">${ev.m2 > 0 ? formatNumber(ev.m2) : ''}</td>
-            <td class="px-2 py-1 border-r border-b border-black text-gray-700 font-bold uppercase text-[10px]">${ev.rodzaj}</td>
-            <td class="px-2 py-1 border-r border-b border-black text-gray-700 font-bold text-[10px] uppercase">${calcDisplay}</td>
-            <td class="px-2 py-1 border-b border-black text-center print-hide">${ev.akcje || '-'}</td>
+            <td class="px-2 py-1 border-r border-b border-black font-bold text-black align-middle">${formatISOToPL(dateToISO(ev.dateObj))}</td>
+            <td class="px-2 py-1 border-r border-b border-black font-bold uppercase align-middle">${ev.jednostka || '-'}</td>
+            <td class="px-2 py-1 border-r border-b border-black text-green-700 font-bold align-middle">${ev.wydanie > 0 ? formatNumber(ev.wydanie) : ''}</td>
+            <td class="px-2 py-1 border-r border-b border-black text-red-600 font-bold align-middle">${ev.utylizacja > 0 ? formatNumber(ev.utylizacja) : ''}</td>
+            <td class="px-2 py-1 border-r border-b border-black font-bold ${zuzycieClass} align-middle">${zuzycieText}</td>
+            <td class="px-2 py-1 border-r border-b border-black font-bold bg-yellow-50 text-black text-sm align-middle">${formatNumber(ev.pozostalo)}</td>
+            <td class="px-2 py-1 border-r border-b border-black text-blue-700 font-bold align-middle">${ev.m2 > 0 ? formatNumber(ev.m2) : ''}</td>
+            <td class="px-2 py-1 border-r border-b border-black text-gray-700 font-bold uppercase text-[10px] align-middle">${ev.rodzaj}</td>
+            <td class="px-2 py-1 border-r border-b border-black text-gray-700 font-bold text-[10px] uppercase align-middle">${calcDisplay}</td>
+            <td class="px-2 py-1 border-b border-black text-center print-hide align-middle">${ev.akcje || '-'}</td>
         </tr>`;
     });
     tbody.innerHTML = html;
@@ -929,9 +1057,9 @@ window.renderDailyInduscoLedger = renderDailyInduscoLedger;
 window.renderNotificationsList = renderNotificationsList;
 window.openNotificationsModal = openNotificationsModal;
 
-// ==========================================
-// UDOSTĘPNIENIE FUNKCJI DLA PLIKU HTML
-// ==========================================
+// UDOSTĘPNIENIE FUNKCJI DLA PLIKU HTML (W TYM AKCEPTACJA WYDAŃ)
+window.acceptInduscoRecord = acceptInduscoRecord;
+window.rejectInduscoRecord = rejectInduscoRecord;
 window.submitInduscoRequest = submitInduscoRequest;
 window.saveBulkIndusco = saveBulkIndusco;
 window.handleInduscoActionChange = handleInduscoActionChange;
