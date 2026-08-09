@@ -208,6 +208,9 @@ export function renderUsersTable() {
         tr.className = "hover:bg-gray-100 transition-colors";
         
         let actionBtn = isAdmin ? `<button onclick="editUser('${u.login}')" class="text-white bg-blue-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-blue-800 leading-none">EDYTUJ</button>` : '-';
+        if (isAdmin && currentUser && u.login !== currentUser.login) {
+            actionBtn += ` <button onclick="deleteUser('${u.login}')" class="text-white bg-red-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-red-800 leading-none ml-1">USUŃ</button>`;
+        }
         
         tr.innerHTML = `
             <td class="px-3 py-2 border-r border-b border-black font-bold">${escapeHTML(u.login)}</td>
@@ -472,6 +475,7 @@ window.renderUsersTable = renderUsersTable;
 window.editUser = editUser;
 window.saveEditUser = saveEditUser;
 window.addNewUser = addNewUser;
+window.deleteUser = deleteUser;
 window.resetProtocolCounter = resetProtocolCounter;
 window.toggleUserPermissionsGrid = toggleUserPermissionsGrid;
 
