@@ -68,7 +68,10 @@ export async function saveToSummaryInternal() {
         const oldEntry = printHistory[existingEntryIndex];
         const currUserStr = currentUser ? (currentUser.name || currentUser.login) : "System";
         const editDateStr = new Date().toLocaleString('pl-PL', {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute:'2-digit'});
-        const authorStr = oldEntry.author + `<br><span class="text-[9px] text-gray-600 font-normal">[Edycja: ${currUserStr} ${editDateStr}]</span>`;
+        let authorStr = oldEntry.author + `<br><span class="text-[9px] text-gray-600 font-normal">[Edycja: ${currUserStr} ${editDateStr}]</span>`;
+        if (oldEntry.rejectionComment) {
+            authorStr += `<br><span class="text-[9px] text-red-500 font-normal">[Poprzednie odrzucenie przez ${escapeHTML(oldEntry.rejectedBy || 'System')}: ${escapeHTML(oldEntry.rejectionComment)}]</span>`;
+        }
 
         printHistory[existingEntryIndex] = {
             id: oldEntry.id, protocolNumber: oldEntry.protocolNumber, projectName: data.projectName, date: dateStr, unit: data.projectName, area: data.area, cost: data.cost, areaBlachy: data.areaBlachy, areaProfile: data.areaProfile, brandStats: data.brandStats, thinnerVol: totalThinner, isError: oldEntry.isError, author: authorStr, items: JSON.parse(JSON.stringify(data.items)), appliedRates: appliedRates, lastModified: Date.now(),
@@ -193,8 +196,6 @@ export async function acceptCurrentPreview() {
             ...newHistory[index],
             isAccepted: true,
             acceptedBy: currentUser ? (currentUser.name || currentUser.login) : "System",
-            rejectionComment: null,
-            rejectedBy: null,
             lastModified: Date.now()
         };
         
@@ -321,10 +322,22 @@ export async function loadHistoryItem(id, sourceTab = 'history', actionType = 'v
     document.getElementById('previewBanner').classList.remove('hidden'); 
     document.getElementById('previewBanner').classList.add('flex');
     document.getElementById('tableActionsContainer').classList.add('hidden');
+    
+    const phc = document.getElementById('previewHistoryContainer');
+    if (phc) phc.classList.remove('hidden');
+
     if (window.switchTab) window.switchTab('calc'); 
     if (window.calculate) window.calculate(); 
     
-    document.querySelectorAll('.protocol-author').forEach(el => el.textContent = entry.author || "");
+    let authorDisplay = entry.author || "";
+    if (entry.rejectionComment) {
+        authorDisplay += `<br><span class="text-[9px] text-red-600 font-bold uppercase">[AKTUALNIE ODRZUCONO PRZEZ ${escapeHTML(entry.rejectedBy || 'System')}: ${escapeHTML(entry.rejectionComment)}]</span>`;
+    }
+    if (entry.isAccepted) {
+        authorDisplay += `<br><span class="text-[9px] text-green-700 font-bold uppercase">[ZATWIERDZONO: ${escapeHTML(entry.acceptedBy || 'System')}]</span>`;
+    }
+    const phcContent = document.getElementById('previewHistoryContent');
+    if (phcContent) phcContent.innerHTML = authorDisplay;
 }
 
 export async function editHistoryItem(id, sourceTab = 'history') {
@@ -386,6 +399,8 @@ export async function editHistoryItem(id, sourceTab = 'history') {
     document.getElementById('previewBanner').classList.add('hidden'); 
     document.getElementById('previewBanner').classList.remove('flex');
     document.getElementById('tableActionsContainer').classList.remove('hidden');
+    const phc = document.getElementById('previewHistoryContainer');
+    if (phc) phc.classList.add('hidden');
     
     if (window.switchTab) window.switchTab('calc'); 
     if (window.calculate) window.calculate();
@@ -451,6 +466,8 @@ export function exitPreviewMode() {
     document.getElementById('previewBanner').classList.add('hidden'); 
     document.getElementById('previewBanner').classList.remove('flex');
     document.getElementById('tableActionsContainer').classList.remove('hidden'); 
+    const phc = document.getElementById('previewHistoryContainer');
+    if (phc) phc.classList.add('hidden');
     
     if (currentUser) {
         document.querySelectorAll('.protocol-author').forEach(el => el.textContent = currentUser.name || currentUser.login || "");
@@ -556,28 +573,45 @@ export function renderHistoryTable() {
 
         let actionsHtml = `<div class="flex flex-col gap-1 items-stretch w-16 mx-auto"><button onclick="loadHistoryItem('${row.id}', 'history', 'view')" class="text-black font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-black hover:text-white bg-white leading-none">PODGLĄD</button>`;
         
-        const canEditBefore = currentUser && currentUser.calcCanEditBefore !== false;
-        const canEditAfter = currentUser && currentUser.calcCanEditAfter === true;
-        const canEdit = currentUser && (currentUser.role === 'admin' || (!row.isAccepted ? canEditBefore : canEditAfter));
+        const isAdmin = currentUser && currentUser.role === 'admin';
+        const calcCanEditBefore = currentUser && (currentUser.calcCanEditBefore !== undefined ? currentUser.calcCanEditBefore : true);
+        const calcCanEditAfter = currentUser && (currentUser.calcCanEditAfter !== undefined ? currentUser.calcCanEditAfter : false);
+        const calcCanAccept = currentUser && (currentUser.calcCanAccept !== undefined ? currentUser.calcCanAccept : isAdmin);
+        const calcCanDelete = currentUser && (currentUser.calcCanDelete !== undefined ? currentUser.calcCanDelete : true);
+        
+        const canEdit = currentUser && (!row.isAccepted ? calcCanEditBefore : calcCanEditAfter);
 
         if (canEdit) {
             actionsHtml += `<button onclick="editHistoryItem('${row.id}', 'history')" class="text-white bg-blue-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-blue-800 leading-none">EDYTUJ</button>`;
         }
 
-        if (currentUser && (currentUser.role === 'admin' || currentUser.calcCanAccept)) {
+        if (calcCanAccept) {
             if (!row.isAccepted && !row.rejectionComment) {
                 actionsHtml += `<button onclick="loadHistoryItem('${row.id}', 'history', 'accept')" class="text-white bg-green-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-green-700 leading-none">POTWIERDŹ</button>`;
                 actionsHtml += `<button onclick="loadHistoryItem('${row.id}', 'history', 'reject')" class="text-white bg-red-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-red-700 leading-none">ODRZUĆ</button>`;
             }
         }
         
-        if (currentUser && (currentUser.role === 'admin' || currentUser.calcCanDelete !== false)) {
+        if (calcCanDelete) {
             actionsHtml += `<button onclick="deleteHistoryItemWithPin('${row.id}')" class="text-black font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-black hover:text-white bg-white leading-none mt-1">USUŃ</button>`;
         }
 
         actionsHtml += `</div>`;
 
-        let authorHtml = `<div class="whitespace-normal">${row.author || '-'}</div>`;
+        let rawAuthor = row.author || '-';
+        let authorParts = rawAuthor.split('<br>');
+        let originalAuthor = authorParts[0];
+        let lastEdit = null;
+        for (let i = authorParts.length - 1; i >= 1; i--) {
+            if (authorParts[i].includes('[Edycja:')) {
+                lastEdit = authorParts[i].replace('[Edycja:', '[Ostatnia edycja:');
+                break;
+            }
+        }
+        let tableAuthorDisplay = originalAuthor;
+        if (lastEdit) tableAuthorDisplay += '<br>' + lastEdit;
+        
+        let authorHtml = `<div class="whitespace-normal">${tableAuthorDisplay}</div>`;
         if (row.isAccepted) {
             authorHtml += `<div class="mt-1 text-[9px] text-green-700 font-bold uppercase border-t border-green-300 pt-0.5">ZAAKCEPTOWANO:<br>${escapeHTML(row.acceptedBy || '-')}</div>`;
         } else if (row.rejectionComment) {
@@ -622,8 +656,10 @@ export async function exportHistoryToExcel() {
         rowExport["Rozcieńczalnik [L]"] = thTotal; rowExport["Koszty Całkowite [PLN]"] = row.cost; rowExport["Status"] = row.isError ? "BŁĘDNY" : "OK"; rowExport["Zatwierdził"] = row.author || "Brak";
         
         let statusAkceptacji = "OCZEKUJE";
-        if (row.isAccepted) statusAkceptacji = `ZAAKCEPTOWANO (${row.acceptedBy})`;
-        else if (row.rejectionComment) statusAkceptacji = `ODRZUCONO: ${row.rejectionComment}`;
+        if (row.isAccepted) {
+            statusAkceptacji = `ZAAKCEPTOWANO (${row.acceptedBy})`;
+            if (row.rejectionComment) statusAkceptacji += ` (Wcześniej odrzucono: ${row.rejectionComment})`;
+        } else if (row.rejectionComment) statusAkceptacji = `ODRZUCONO: ${row.rejectionComment}`;
         rowExport["Akceptacja"] = statusAkceptacji;
         
         return rowExport;

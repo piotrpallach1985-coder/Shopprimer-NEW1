@@ -96,22 +96,22 @@ export function updateAllStocks() {
             let isKorekta = r.isRemanent || r.actionType === 'remanent';
             
             let btnAkcje = `<div class="flex flex-col gap-1 items-stretch w-16 mx-auto print-hide">`;
-            const canEditBefore = currentUser && currentUser.indCanEditBefore !== false;
-            const canEditAfter = currentUser && currentUser.indCanEditAfter === true;
-            const canAccept = currentUser && currentUser.indCanAccept !== false;
             const isAdmin = currentUser && currentUser.role === 'admin';
-
-            if (isAdmin || (!r.isAccepted && canEditBefore) || (r.isAccepted && canEditAfter)) {
+            const canEditBefore = currentUser && (currentUser.indCanEditBefore !== undefined ? currentUser.indCanEditBefore : true);
+            const canEditAfter = currentUser && (currentUser.indCanEditAfter !== undefined ? currentUser.indCanEditAfter : false);
+            const canAccept = currentUser && (currentUser.indCanAccept !== undefined ? currentUser.indCanAccept : isAdmin);
+            
+            if ((!r.isAccepted && canEditBefore) || (r.isAccepted && canEditAfter)) {
                 btnAkcje += `<button onclick="editInduscoRecord(${idx})" class="text-white bg-blue-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-blue-800 leading-none">EDYTUJ</button>`;
             }
             
-            if (canAccept || isAdmin) {
+            if (canAccept) {
                 if (!r.isAccepted) {
                     if (r.rejectionComment) {
                         btnAkcje += `<button onclick="acceptInduscoRecord(${idx})" class="text-white bg-green-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-green-700 leading-none">Zatwierdź</button>`;
                     } else {
                         btnAkcje += `<button onclick="acceptInduscoRecord(${idx})" class="text-white bg-green-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-green-700 leading-none">Zatwierdź</button>
-                                     <button onclick="rejectInduscoRecord(${idx})" class="text-white bg-red-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-red-700 mt-1 leading-none">Odrzuć</button>`;
+                                     <button onclick="rejectInduscoRecord(${idx})" class="text-white bg-red-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-red-700 leading-none">Odrzuć</button>`;
                     }
                 }
             }
@@ -145,15 +145,16 @@ export function updateAllStocks() {
                 const pName = `${brand} - Rozcieńczalnik`;
                 if (calcEvents[pName]) {
                     let actionsHtml = `<div class="flex flex-col gap-1 items-stretch w-16 mx-auto"><button onclick="loadHistoryItem('${p.id}', 'daily', 'view')" class="text-black font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-black hover:text-white bg-white leading-none print-hide">PODGLĄD</button>`;
-                    
-                    const canEditBefore = currentUser && currentUser.calcCanEditBefore !== false;
-                    const canEditAfter = currentUser && currentUser.calcCanEditAfter === true;
-                    const canEdit = currentUser && (currentUser.role === 'admin' || (!p.isAccepted ? canEditBefore : canEditAfter));
+                    const isAdmin = currentUser && currentUser.role === 'admin';
+                    const canEditBefore = currentUser && (currentUser.calcCanEditBefore !== undefined ? currentUser.calcCanEditBefore : true);
+                    const canEditAfter = currentUser && (currentUser.calcCanEditAfter !== undefined ? currentUser.calcCanEditAfter : false);
+                    const canEdit = currentUser && (!p.isAccepted ? canEditBefore : canEditAfter);
+                    const calcCanAccept = currentUser && (currentUser.calcCanAccept !== undefined ? currentUser.calcCanAccept : isAdmin);
 
                     if (canEdit) {
                         actionsHtml += `<button onclick="editHistoryItem('${p.id}', 'daily')" class="text-white bg-blue-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-blue-800 leading-none">EDYTUJ</button>`;
                     }
-                    if (currentUser && (currentUser.role === 'admin' || currentUser.calcCanAccept)) {
+                    if (calcCanAccept) {
                         if (!p.isAccepted && !p.rejectionComment) {
                             actionsHtml += `<button onclick="loadHistoryItem('${p.id}', 'daily', 'accept')" class="text-white bg-green-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-green-700 leading-none">POTWIERDŹ</button>`;
                             actionsHtml += `<button onclick="loadHistoryItem('${p.id}', 'daily', 'reject')" class="text-white bg-red-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-red-700 leading-none">ODRZUĆ</button>`;
@@ -175,15 +176,16 @@ export function updateAllStocks() {
                         const pName = `${brand} - ${color}`;
                         if (calcEvents[pName]) {
                             let actionsHtml = `<div class="flex flex-col gap-1 items-stretch w-16 mx-auto"><button onclick="loadHistoryItem('${p.id}', 'daily', 'view')" class="text-black font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-black hover:text-white bg-white leading-none print-hide">PODGLĄD</button>`;
-                            
-                            const canEditBefore = currentUser && currentUser.calcCanEditBefore !== false;
-                            const canEditAfter = currentUser && currentUser.calcCanEditAfter === true;
-                            const canEdit = currentUser && (currentUser.role === 'admin' || (!p.isAccepted ? canEditBefore : canEditAfter));
+                            const isAdmin = currentUser && currentUser.role === 'admin';
+                            const canEditBefore = currentUser && (currentUser.calcCanEditBefore !== undefined ? currentUser.calcCanEditBefore : true);
+                            const canEditAfter = currentUser && (currentUser.calcCanEditAfter !== undefined ? currentUser.calcCanEditAfter : false);
+                            const canEdit = currentUser && (!p.isAccepted ? canEditBefore : canEditAfter);
+                            const calcCanAccept = currentUser && (currentUser.calcCanAccept !== undefined ? currentUser.calcCanAccept : isAdmin);
 
                             if (canEdit) {
                                 actionsHtml += `<button onclick="editHistoryItem('${p.id}', 'daily')" class="text-white bg-blue-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-blue-800 leading-none">EDYTUJ</button>`;
                             }
-                            if (currentUser && (currentUser.role === 'admin' || currentUser.calcCanAccept)) {
+                            if (calcCanAccept) {
                                 if (!p.isAccepted && !p.rejectionComment) {
                                     actionsHtml += `<button onclick="loadHistoryItem('${p.id}', 'daily', 'accept')" class="text-white bg-green-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-green-700 leading-none">POTWIERDŹ</button>`;
                                     actionsHtml += `<button onclick="loadHistoryItem('${p.id}', 'daily', 'reject')" class="text-white bg-red-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-red-700 leading-none">ODRZUĆ</button>`;
@@ -380,33 +382,46 @@ export function renderInduscoTable() {
                 amountDisplay = formatNumber(Math.abs(row.amount), 2);
             }
 
-            let authorHtml = `<div class="whitespace-normal text-[10px]">${row.author ? row.author.replace(/<[^>]*>?/gm, '') : '-'}</div>`;
+            let rawAuthor = row.author || '-';
+            let authorParts = rawAuthor.split('<br>');
+            let originalAuthor = authorParts[0].replace(/<[^>]*>?/gm, '');
+            let lastEdit = null;
+            for (let i = authorParts.length - 1; i >= 1; i--) {
+                if (authorParts[i].includes('[Edycja:')) {
+                    lastEdit = authorParts[i].replace(/<[^>]*>?/gm, '').replace('[Edycja:', '[Ostatnia edycja:');
+                    break;
+                }
+            }
+            let tableAuthorDisplay = originalAuthor;
+            if (lastEdit) tableAuthorDisplay += '<br><span class="text-gray-500 text-[9px]">' + lastEdit + '</span>';
+            
+            let authorHtml = `<div class="whitespace-normal text-[10px]">${tableAuthorDisplay}</div>`;
             if (row.isAccepted) {
                 authorHtml += `<div class="mt-1 text-[9px] text-green-700 font-bold uppercase border-t border-green-300 pt-0.5">ZAAKCEPTOWAŁ(A):<br>${escapeHTML(row.acceptedBy)}</div>`;
             } else if (row.rejectionComment) {
-                authorHtml += `<div class="mt-1 text-[9px] text-red-700 font-bold border-t border-red-300 pt-0.5" title="${escapeHTML(row.rejectionComment)}"><span class="uppercase">ODRZUCONO:</span><br><span class="font-normal italic">${escapeHTML(row.rejectionComment)}</span></div>`;
+                authorHtml += `<div class="mt-1 text-[9px] text-red-700 font-bold border-t border-red-300 pt-0.5" title="${escapeHTML(row.rejectionComment)}"><span class="uppercase">ODRZUCONO PRZEZ ${escapeHTML(row.rejectedBy || 'System')}:</span><br><span class="font-normal italic">${escapeHTML(row.rejectionComment)}</span></div>`;
             } else {
                 authorHtml += `<div class="mt-1 text-[9px] text-orange-600 font-bold uppercase border-t border-orange-300 pt-0.5">OCZEKUJE</div>`;
             }
 
-            let akcjeHtml = `<div class="flex flex-col gap-1 items-center w-16 mx-auto">`;
-            const canEditBefore = currentUser && currentUser.indCanEditBefore !== false;
-            const canEditAfter = currentUser && currentUser.indCanEditAfter === true;
-            const canAccept = currentUser && currentUser.indCanAccept !== false;
-            const canDelete = currentUser && currentUser.indCanDelete !== false;
+            let akcjeHtml = `<div class="flex flex-col gap-1 items-stretch w-16 mx-auto">`;
             const isAdmin = currentUser && currentUser.role === 'admin';
+            const canEditBefore = currentUser && (currentUser.indCanEditBefore !== undefined ? currentUser.indCanEditBefore : true);
+            const canEditAfter = currentUser && (currentUser.indCanEditAfter !== undefined ? currentUser.indCanEditAfter : false);
+            const canAccept = currentUser && (currentUser.indCanAccept !== undefined ? currentUser.indCanAccept : isAdmin);
+            const canDelete = currentUser && (currentUser.indCanDelete !== undefined ? currentUser.indCanDelete : true);
 
-            if (isAdmin || (!row.isAccepted && canEditBefore) || (row.isAccepted && canEditAfter)) {
+            if ((!row.isAccepted && canEditBefore) || (row.isAccepted && canEditAfter)) {
                 akcjeHtml += `<button onclick="editInduscoRecord(${i})" class="w-full text-white bg-blue-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-blue-800 leading-none">EDYTUJ</button>`;
             }
             
-            if (canAccept || isAdmin) {
+            if (canAccept) {
                 if (!row.isAccepted) {
                     if (row.rejectionComment) {
                          akcjeHtml += `<button onclick="acceptInduscoRecord(${i})" class="w-full text-white bg-green-600 font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-green-700 leading-none">Zatwierdź</button>`;
                     } else {
                          akcjeHtml += `<button onclick="acceptInduscoRecord(${i})" class="w-full text-white bg-green-600 font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-green-700 leading-none">Zatwierdź</button>
-                                       <button onclick="rejectInduscoRecord(${i})" class="w-full text-white bg-red-600 font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-red-700 mt-1 leading-none">Odrzuć</button>`;
+                                       <button onclick="rejectInduscoRecord(${i})" class="w-full text-white bg-red-600 font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-red-700 leading-none">Odrzuć</button>`;
                     }
                 }
             }
@@ -513,8 +528,6 @@ export async function acceptInduscoRecord(index) {
         
         induscoHistory[index].isAccepted = true;
         induscoHistory[index].acceptedBy = currentUser ? (currentUser.name || currentUser.login) : "System";
-        induscoHistory[index].rejectionComment = null;
-        induscoHistory[index].rejectedBy = null;
         induscoHistory[index].lastModified = Date.now();
         
         if (window.setInduscoHistory) window.setInduscoHistory(induscoHistory);
@@ -573,11 +586,11 @@ export async function removeInduscoRecord(index) {
 
 export async function editInduscoRecord(index) {
     const record = induscoHistory[index];
-    const canEditAfter = currentUser && currentUser.indCanEditAfter === true;
     const isAdmin = currentUser && currentUser.role === 'admin';
+    const canEditAfter = currentUser && (currentUser.indCanEditAfter !== undefined ? currentUser.indCanEditAfter : false);
 
     if (record.isAccepted) {
-        if (!isAdmin && !canEditAfter) {
+        if (!canEditAfter) {
             await window.customAlert("Ten wpis został zaakceptowany i jest zablokowany do edycji.");
             return;
         }
@@ -635,7 +648,11 @@ export async function saveEditIndusco() {
 
     const currUserStr = currentUser ? (currentUser.name || currentUser.login) : "System";
     const editDateStr = new Date().toLocaleString('pl-PL', {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute:'2-digit'});
-    const editInfo = `<br><span class="text-[9px] text-gray-500 font-normal">[Edycja: ${currUserStr} ${editDateStr}]</span>`;
+    let editInfo = `<br><span class="text-[9px] text-gray-500 font-normal">[Edycja: ${currUserStr} ${editDateStr}]</span>`;
+
+    if (induscoHistory[index].rejectionComment) {
+        editInfo += `<br><span class="text-[9px] text-red-500 font-normal">[Poprzednie odrzucenie przez ${escapeHTML(induscoHistory[index].rejectedBy || 'System')}: ${escapeHTML(induscoHistory[index].rejectionComment)}]</span>`;
+    }
 
     induscoHistory[index].date = formatISOToPL(dIso); induscoHistory[index].paintType = type;
     induscoHistory[index].actionType = actionType; induscoHistory[index].isRemanent = isRem;
@@ -697,6 +714,11 @@ export function updateAlertsUI() {
         bellIcon.classList.add('animate-pulse', 'text-red-600');
         badge.textContent = alertCount;
         badge.classList.remove('hidden');
+        
+        if (!window.initialAlertsShown) {
+            window.initialAlertsShown = true;
+            if (window.openNotificationsModal) window.openNotificationsModal();
+        }
     } else {
         bellIcon.classList.remove('animate-pulse', 'text-red-600');
         badge.classList.add('hidden');

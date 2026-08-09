@@ -479,7 +479,6 @@ export function closePaintReportModal() { const m = document.getElementById('pai
 export function openEditInduscoModal() { const m = document.getElementById('editInduscoModal'); if (m) { m.classList.remove('hidden'); m.classList.add('flex'); } }
 export function closeEditInduscoModal() { const m = document.getElementById('editInduscoModal'); if (m) { m.classList.add('hidden'); m.classList.remove('flex'); } }
 
-export function openPaintRulesModal() { const m = document.getElementById('paintRulesModal'); if (m) { m.classList.remove('hidden'); m.classList.add('flex'); } }
 export function closePaintRulesModal() { const m = document.getElementById('paintRulesModal'); if (m) { m.classList.add('hidden'); m.classList.remove('flex'); } }
 
 export function openConfigDailyPaintsModal() { const m = document.getElementById('configDailyPaintsModal'); if (m) { m.classList.remove('hidden'); m.classList.add('flex'); } }
@@ -516,7 +515,6 @@ window.openPaintReportModal = openPaintReportModal;
 window.closePaintReportModal = closePaintReportModal;
 window.openEditInduscoModal = openEditInduscoModal;
 window.closeEditInduscoModal = closeEditInduscoModal;
-window.openPaintRulesModal = openPaintRulesModal;
 window.closePaintRulesModal = closePaintRulesModal;
 window.openConfigDailyPaintsModal = openConfigDailyPaintsModal;
 window.closeConfigDailyPaintsModal = closeConfigDailyPaintsModal;
