@@ -320,7 +320,7 @@ export async function saveEditUser() {
     if(hideInduscoReqCb) u.hideInduscoReq = hideInduscoReqCb.checked;
 
     // Zbieramy zaznaczone uprawnienia do zakładek (tylko z dostępnych pól wyboru)
-    const checkboxes = document.querySelectorAll('.edit-user-tab-cb');
+        const checkboxes = document.querySelectorAll('.edit-user-tab-cb');
     if (checkboxes.length > 0) {
         u.allowedTabs = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
     }
@@ -338,6 +338,33 @@ export async function saveEditUser() {
     dbSet(dbRef(firebaseDb, 'appState/appUsers'), usersList);
     closeEditUserModal();
     await customAlert("Zapisano zmiany uprawnień użytkownika.");
+}
+
+export async function deleteUser(login) {
+    try {
+        if (!currentUser || currentUser.role !== 'admin') return;
+        if (login === currentUser.login) {
+            await customAlert("Nie możesz usunąć własnego konta!");
+            return;
+        }
+        if (await customConfirm(`Czy na pewno chcesz usunąć użytkownika ${login}?`)) {
+            const idx = usersList.findIndex(u => u.login === login);
+            if (idx !== -1) {
+                // Ensure usersList remains a pure array without proxies if any
+                const newList = [...usersList];
+                newList.splice(idx, 1);
+                
+                await dbSet(dbRef(firebaseDb, 'appState/appUsers'), newList);
+                
+                // Aktualizujemy lokalnie
+                usersList.splice(idx, 1);
+                renderUsersTable();
+                await customAlert("Użytkownik został usunięty.");
+            }
+        }
+    } catch (e) {
+        await customAlert("Wystąpił błąd podczas usuwania: " + e.message);
+    }
 }
 
 export async function addNewUser() {
