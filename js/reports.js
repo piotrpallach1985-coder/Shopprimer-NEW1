@@ -1,7 +1,7 @@
 // --- MODUŁ RAPORTÓW I WYKRESÓW PORÓWNAWCZYCH (REPORTS.JS) ---
 
 import { formatNumber, escapeHTML, parsePlDate, dateToISO, formatISOToPL } from './utils.js';
-import { printHistory, induscoDailyRecords, paintTypes } from './store.js';
+import { printHistory, induscoDailyRecords, paintTypes, paintMonthlyCosts } from './store.js';
 
 let chartM2Instance = null;
 let chartZuzInstance = null;
@@ -192,6 +192,19 @@ export function renderPaintReport() {
                 percent = (data.paint / totalPaintByBrand[paintId].paint) * 100;
             }
 
+            let paintMonthlyCostsForMonth = paintMonthlyCosts && paintMonthlyCosts[monthVal] ? paintMonthlyCosts[monthVal] : {};
+            let paintCostInput = (paintMonthlyCostsForMonth[paintId] && paintMonthlyCostsForMonth[paintId].paint) || 0;
+            let thinnerCostInput = (paintMonthlyCostsForMonth[paintId] && paintMonthlyCostsForMonth[paintId].thinner) || 0;
+         
+            let rowPaintCost = 0, rowThinnerCost = 0;
+            if (totalPaintByBrand[paintId] && totalPaintByBrand[paintId].paint > 0) {
+                rowPaintCost = (data.paint / totalPaintByBrand[paintId].paint) * paintCostInput;
+            }
+            if (totalPaintByBrand[paintId] && totalPaintByBrand[paintId].thinner > 0) {
+                rowThinnerCost = (data.thinner / totalPaintByBrand[paintId].thinner) * thinnerCostInput;
+            }
+            let totalRowCost = rowPaintCost + rowThinnerCost;
+
             html += `
                 <tr class="hover:bg-gray-50 transition-colors border-b border-black">
                     ${unitCellHtml}
@@ -199,7 +212,8 @@ export function renderPaintReport() {
                     <td class="px-3 py-2 border-r border-black text-right text-blue-700 font-bold">${formatNumber(data.paint, 2)}</td>
                     <td class="px-3 py-2 border-r border-black text-right text-yellow-600 font-bold">${formatNumber(data.thinner, 2)}</td>
                     <td class="px-3 py-2 border-r border-black text-right text-purple-700 font-bold">${formatNumber(percent, 1)}%</td>
-                    <td class="px-3 py-2 text-right font-bold text-green-700">${formatNumber(data.paint + data.thinner, 2)}</td>
+                    <td class="px-3 py-2 border-r border-black text-right font-bold text-green-700">${formatNumber(data.paint + data.thinner, 2)}</td>
+                    <td class="px-3 py-2 text-right font-bold text-red-700">${formatNumber(totalRowCost, 2)}</td>
                 </tr>
             `;
         });
@@ -207,27 +221,46 @@ export function renderPaintReport() {
     tbody.innerHTML = html;
 
     let footerHtml = '';
+    let grandTotalCost = 0;
     const brandKeys = Object.keys(totalPaintByBrand).sort();
     brandKeys.forEach(bId => {
         const bData = totalPaintByBrand[bId];
+        let paintMonthlyCostsForMonth = paintMonthlyCosts && paintMonthlyCosts[monthVal] ? paintMonthlyCosts[monthVal] : {};
+        let pCost = (paintMonthlyCostsForMonth[bId] && paintMonthlyCostsForMonth[bId].paint) || 0;
+        let tCost = (paintMonthlyCostsForMonth[bId] && paintMonthlyCostsForMonth[bId].thinner) || 0;
+        let bTotalCost = parseFloat(pCost) + parseFloat(tCost);
+        grandTotalCost += bTotalCost;
+
         footerHtml += `
             <tr class="bg-gray-100 border-t border-black">
                 <td colspan="2" class="px-3 py-1.5 border-r border-black text-right font-bold text-gray-700">PODSUMOWANIE: ${bId}</td>
                 <td class="px-3 py-1.5 border-r border-black text-right font-bold text-blue-800">${formatNumber(bData.paint, 2)}</td>
                 <td class="px-3 py-1.5 border-r border-black text-right font-bold text-yellow-700">${formatNumber(bData.thinner, 2)}</td>
                 <td class="px-3 py-1.5 border-r border-black text-right font-bold text-purple-800">100.0%</td>
-                <td class="px-3 py-1.5 text-right font-bold text-green-800">${formatNumber(bData.paint + bData.thinner, 2)}</td>
+                <td class="px-3 py-1.5 border-r border-black text-right font-bold text-green-800">${formatNumber(bData.paint + bData.thinner, 2)}</td>
+                <td class="px-3 py-1.5 text-right font-bold text-red-800">${formatNumber(bTotalCost, 2)}</td>
+            </tr>
+            <tr class="bg-yellow-50 border-t border-black print-hide">
+                <td colspan="2" class="px-3 py-1.5 border-r border-black text-right font-bold text-gray-700 text-[10px] align-middle uppercase">Wprowadź koszty łączne farby dla ${bId}:</td>
+                <td class="px-3 py-1 border-r border-black text-right">
+                    <input type="number" step="0.01" min="0" placeholder="Koszt Farby [PLN]" value="${pCost || ''}" onchange="savePaintMonthlyCost('${monthVal}', '${bId}', 'paint', parseFloat(this.value) || 0)" class="w-full max-w-[100px] border border-black p-1 text-xs font-bold outline-none text-right focus:bg-white bg-transparent">
+                </td>
+                <td class="px-3 py-1 border-r border-black text-right">
+                    <input type="number" step="0.01" min="0" placeholder="Koszt Roz. [PLN]" value="${tCost || ''}" onchange="savePaintMonthlyCost('${monthVal}', '${bId}', 'thinner', parseFloat(this.value) || 0)" class="w-full max-w-[100px] border border-black p-1 text-xs font-bold outline-none text-right focus:bg-white bg-transparent">
+                </td>
+                <td colspan="3" class="px-3 py-1 text-left text-gray-500 text-[10px] italic align-middle">Po wpisaniu kwoty koszty zaktualizują się w wierszach projektów.</td>
             </tr>
         `;
     });
 
     footerHtml += `
         <tr class="border-t-2 border-black bg-gray-200">
-            <td colspan="2" class="px-3 py-2 border-r border-black text-right font-bold text-black">SUMA CAŁKOWITA MIESIĄCA [L]:</td>
-            <td class="px-3 py-2 border-r border-black text-right text-black font-bold">${formatNumber(totalPaintAll, 2)}</td>
-            <td class="px-3 py-2 border-r border-black text-right text-black font-bold">${formatNumber(totalThinnerAll, 2)}</td>
+            <td colspan="2" class="px-3 py-2 border-r border-black text-right font-bold text-black">SUMA CAŁKOWITA MIESIĄCA:</td>
+            <td class="px-3 py-2 border-r border-black text-right text-black font-bold">${formatNumber(totalPaintAll, 2)} L</td>
+            <td class="px-3 py-2 border-r border-black text-right text-black font-bold">${formatNumber(totalThinnerAll, 2)} L</td>
             <td class="px-3 py-2 border-r border-black text-right text-black font-bold">-</td>
-            <td class="px-3 py-2 text-right text-black font-bold">${formatNumber(totalPaintAll + totalThinnerAll, 2)}</td>
+            <td class="px-3 py-2 border-r border-black text-right text-black font-bold">${formatNumber(totalPaintAll + totalThinnerAll, 2)} L</td>
+            <td class="px-3 py-2 text-right text-red-900 font-bold">${formatNumber(grandTotalCost, 2)} PLN</td>
         </tr>
     `;
     tfoot.innerHTML = footerHtml;

@@ -1,11 +1,12 @@
 // --- MODUŁ OBLICZEŃ, BAZY PROFILI I REGUŁ BIZNESOWYCH (CALCULATOR.JS) ---
 
-import { shopPrimerRules, steelGradesList } from './config.js';
+import { shopPrimerRules, steelGradesList, ADMIN_PIN } from './config.js';
 import { formatNumber, escapeHTML } from './utils.js';
 import {
     database, inputData, resultsData, paintTypes, laborCosts, visibleDailyPaints,
-    setResultsData, setInputData, autoSaveToDisk
+    setResultsData, setInputData
 } from './store.js';
+import { firebaseDb, dbRef, dbSet, currentUser } from './auth.js';
 
 // ==========================================
 // 1. NARZĘDZIA FORMULARZA (UI)
@@ -100,11 +101,12 @@ export async function addManualDbItem() {
     
     const isUpdate = database[cat][safeKey] !== undefined;
     database[cat][safeKey] = mnoznik;
+    database.lastModified = Date.now();
 
     document.getElementById('formDbNazwa').value = '';
     document.getElementById('formDbMnoznik').value = '';
 
-    renderDbTable(); updateProfilSelect(); autoSaveToDisk(true);
+    renderDbTable(); updateProfilSelect(); dbSet(dbRef(firebaseDb, 'appState/database'), database);
 
     if (isUpdate) await window.customAlert(`Zaktualizowano mnożnik dla profilu: ${safeKey}`);
     else await window.customAlert(`Dodano nowy profil: ${safeKey} do kategorii ${cat}`);
@@ -115,7 +117,8 @@ export async function updateDbMultiplier(cat, key, value) {
     const num = parseFloat(cleanValue);
     if (!isNaN(num) && num > 0) {
         database[cat][key] = num;
-        updateProfilSelect(); calculate(); autoSaveToDisk();
+        database.lastModified = Date.now();
+        updateProfilSelect(); calculate(); dbSet(dbRef(firebaseDb, 'appState/database'), database);
     } else {
         await window.customAlert("Podana wartość musi być liczbą większą od zera.");
         renderDbTable();
@@ -124,14 +127,15 @@ export async function updateDbMultiplier(cat, key, value) {
 
 export async function removeDbItem(cat, key) {
     const pin = await window.customPrompt("Podaj kod autoryzacji (PIN), aby usunąć profil z bazy:", 'password');
-    if (pin === "4321") {
+    if (pin === ADMIN_PIN) {
         if (database[cat] && database[cat][key] !== undefined) {
             delete database[cat][key];
+            database.lastModified = Date.now();
             window.forceNextCloudOverwrite = true;
             renderDbTable(); 
             updateProfilSelect(); 
             calculate(); 
-            autoSaveToDisk(true);
+            dbSet(dbRef(firebaseDb, 'appState/database'), database);
             await window.customAlert(`Profil ${key} został usunięty.`);
         }
     } else if (pin !== null) {
@@ -252,12 +256,35 @@ export function renderColorsTable() {
 
 export function renderPaintTypesTable() {
     const tbody = document.getElementById('paintTypesTableBody');
+    const isAdmin = currentUser && currentUser.role === 'admin';
+    const inputState = isAdmin ? '' : 'disabled';
+    const inputClass = isAdmin ? 'border border-transparent hover:border-black focus:border-black outline-none bg-transparent focus:bg-white transition-all' : 'bg-transparent text-gray-500 cursor-not-allowed';
     
-    // AKTUALIZACJA PÓŁ KOSZTÓW W WIDOKU
+    // AKTUALIZACJA PÓL KOSZTÓW W WIDOKU
     const inputCostBlachy = document.getElementById('costBlachy');
     const inputCostProfile = document.getElementById('costProfile');
-    if (inputCostBlachy) inputCostBlachy.value = laborCosts.blachy || 4.20;
-    if (inputCostProfile) inputCostProfile.value = laborCosts.profile || 6.80;
+    const newPaintName = document.getElementById('newPaintName');
+    const addPaintBtn = document.querySelector('button[onclick="addPaintType()"]');
+
+    if (inputCostBlachy) {
+        inputCostBlachy.value = laborCosts.blachy || 4.20;
+        inputCostBlachy.disabled = !isAdmin;
+        inputCostBlachy.className = isAdmin ? 'w-32 border border-black p-1 text-sm outline-none font-bold' : 'w-32 border border-gray-300 p-1 text-sm outline-none font-bold bg-transparent text-gray-500 cursor-not-allowed';
+    }
+    if (inputCostProfile) {
+        inputCostProfile.value = laborCosts.profile || 6.80;
+        inputCostProfile.disabled = !isAdmin;
+        inputCostProfile.className = isAdmin ? 'w-32 border border-black p-1 text-sm outline-none font-bold' : 'w-32 border border-gray-300 p-1 text-sm outline-none font-bold bg-transparent text-gray-500 cursor-not-allowed';
+    }
+    if (newPaintName) {
+        newPaintName.disabled = !isAdmin;
+        if (!isAdmin) {
+            newPaintName.parentElement.style.display = 'none';
+        } else {
+            newPaintName.parentElement.style.display = 'block';
+        }
+    }
+    if (addPaintBtn) addPaintBtn.style.display = isAdmin ? 'block' : 'none';
 
     if(!tbody) return;
     
@@ -267,10 +294,12 @@ export function renderPaintTypesTable() {
         if (pt.fallbacks && Object.keys(pt.fallbacks).length > 0) {
             fallbacksHtml = '<div class="mt-1 space-y-0.5">';
             for (const [color, targetId] of Object.entries(pt.fallbacks)) {
-                fallbacksHtml += `<div class="text-[9px] font-normal normal-case bg-gray-100 text-gray-800 border border-gray-300 px-1 py-0.5 w-max">Gdy kolor <b>${color}</b> → użyj <b>${targetId}</b></div>`;
+                fallbacksHtml += `<div class="text-[9px] font-normal normal-case bg-gray-100 text-gray-800 border border-gray-300 px-1 py-0.5 w-max">Gdy kolor <b>${color}</b> — użyj <b>${targetId}</b></div>`;
             }
             fallbacksHtml += '</div>';
         }
+
+        const akcjaHtml = isAdmin ? `<div class="flex flex-col gap-1 items-center w-16 mx-auto"><button onclick="openPaintRulesModal('${pt.id}')" class="w-full text-white bg-blue-600 font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-blue-800 leading-none">Reguły</button><button onclick="removePaintType('${pt.id}')" class="w-full text-black font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-black hover:text-white bg-white leading-none">Usuń</button></div>` : '<div class="text-[10px] text-gray-400 font-bold uppercase text-center w-full">-</div>';
 
         html += `
             <tr class="hover:bg-gray-50 border-b border-gray-300">
@@ -279,19 +308,16 @@ export function renderPaintTypesTable() {
                     ${fallbacksHtml}
                 </td>
                 <td class="px-3 py-1.5 border-r border-black text-center">
-                    <input type="number" step="0.1" min="0.1" value="${pt.yieldBlachy}" onchange="updatePaintParam('${pt.id}', 'yieldBlachy', this.value)" class="w-20 text-center border border-transparent hover:border-black focus:border-black outline-none bg-transparent focus:bg-white font-bold text-black px-1 py-0.5 transition-all">
+                    <input type="number" step="0.1" min="0.1" value="${pt.yieldBlachy}" onchange="updatePaintParam('${pt.id}', 'yieldBlachy', this.value)" class="w-20 text-center outline-none font-bold text-black px-1 py-0.5 ${inputClass}" ${inputState}>
                 </td>
                 <td class="px-3 py-1.5 border-r border-black text-center">
-                    <input type="number" step="0.1" min="0.1" value="${pt.yieldProfile}" onchange="updatePaintParam('${pt.id}', 'yieldProfile', this.value)" class="w-20 text-center border border-transparent hover:border-black focus:border-black outline-none bg-transparent focus:bg-white font-bold text-black px-1 py-0.5 transition-all">
+                    <input type="number" step="0.1" min="0.1" value="${pt.yieldProfile}" onchange="updatePaintParam('${pt.id}', 'yieldProfile', this.value)" class="w-20 text-center outline-none font-bold text-black px-1 py-0.5 ${inputClass}" ${inputState}>
                 </td>
                 <td class="px-3 py-1.5 border-r border-black text-center">
-                    <input type="number" step="1" min="0" value="${pt.thinnerPct}" onchange="updatePaintParam('${pt.id}', 'thinnerPct', this.value)" class="w-16 text-center border border-transparent hover:border-black focus:border-black outline-none bg-transparent focus:bg-white font-bold text-black px-1 py-0.5 transition-all">
+                    <input type="number" step="1" min="0" value="${pt.thinnerPct}" onchange="updatePaintParam('${pt.id}', 'thinnerPct', this.value)" class="w-16 text-center outline-none font-bold text-black px-1 py-0.5 ${inputClass}" ${inputState}>
                 </td>
                 <td class="px-3 py-1.5 text-center border-black">
-                    <div class="flex flex-col gap-1 items-center w-16 mx-auto">
-                        <button onclick="openPaintRulesModal('${pt.id}')" class="w-full text-white bg-blue-600 font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-blue-800 leading-none">Reguły</button>
-                        <button onclick="removePaintType('${pt.id}')" class="w-full text-black font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-black hover:text-white bg-white leading-none">Usuń</button>
-                    </div>
+                    ${akcjaHtml}
                 </td>
             </tr>
         `;
@@ -300,26 +326,31 @@ export function renderPaintTypesTable() {
 }
 
 export function updateLaborCosts() {
+    if (!currentUser || currentUser.role !== 'admin') return;
     laborCosts.blachy = parseFloat(document.getElementById('costBlachy').value) || 4.20;
     laborCosts.profile = parseFloat(document.getElementById('costProfile').value) || 6.80;
-    calculateCosts(); autoSaveToDisk();
+    laborCosts.lastModified = Date.now();
+    calculateCosts(); dbSet(dbRef(firebaseDb, 'appState/laborCosts'), laborCosts);
 }
 
 export function updatePaintParam(id, field, value) {
+    if (!currentUser || currentUser.role !== 'admin') return;
     const pt = paintTypes.find(p => p.id === id);
     if(pt) {
         const parsedValue = parseFloat(value.replace(',', '.')) || 0;
         pt[field] = Math.max(parsedValue, 0.1); 
-        calculateCosts(); autoSaveToDisk(true);
+        pt.lastModified = Date.now();
+        calculateCosts(); dbSet(dbRef(firebaseDb, 'appState/paintTypes'), paintTypes);
     }
 }
 
 export async function addPaintType() {
+    if (!currentUser || currentUser.role !== 'admin') { await window.customAlert('Brak uprawnień!'); return; }
     const name = document.getElementById('newPaintName').value.trim().toUpperCase();
     if(!name) { await window.customAlert('Podaj nazwę farby!'); return; }
     if(paintTypes.find(p => p.id === name)) { await window.customAlert('Farba już istnieje!'); return; }
     
-    paintTypes.push({ id: name, name: name, yieldBlachy: 10.0, yieldProfile: 6.5, thinnerPct: 14, fallbacks: {} });
+    paintTypes.push({ id: name, name: name, yieldBlachy: 10.0, yieldProfile: 6.5, thinnerPct: 14, fallbacks: {}, lastModified: Date.now() });
     
     if (visibleDailyPaints !== null) {
         visibleDailyPaints.push(`${name} - Szary`);
@@ -335,11 +366,13 @@ export async function addPaintType() {
     if(window.renderDailySidebar) window.renderDailySidebar(); 
     if(window.renderHistoryTable) window.renderHistoryTable(); 
     
-    await autoSaveToDisk(true);
+    await dbSet(dbRef(firebaseDb, 'appState/paintTypes'), paintTypes);
+    if (visibleDailyPaints) await dbSet(dbRef(firebaseDb, 'appState/visibleDailyPaints'), visibleDailyPaints);
     await window.customAlert('Dodano nową farbę pomyślnie!');
 }
 
 export async function removePaintType(id) {
+    if (!currentUser || currentUser.role !== 'admin') { await window.customAlert('Brak uprawnień!'); return; }
     if(id === 'SIGMAWELD') { await window.customAlert('Nie można usunąć głównej farby systemowej SIGMAWELD.'); return; }
     if(await window.customConfirm(`Czy na pewno usunąć farbę ${id}?`)) {
         window.forceNextCloudOverwrite = true;
@@ -357,7 +390,7 @@ export async function removePaintType(id) {
         if(window.updateAllStocks) window.updateAllStocks(); 
         if(window.renderDailySidebar) window.renderDailySidebar(); 
         if(window.renderHistoryTable) window.renderHistoryTable(); 
-        await autoSaveToDisk(true);
+        await dbSet(dbRef(firebaseDb, 'appState/paintTypes'), paintTypes);
     }
 }
 
@@ -394,6 +427,7 @@ export function openPaintRulesModal(id) {
 }
 
 export function savePaintRules() {
+    if (!currentUser || currentUser.role !== 'admin') { window.customAlert('Brak uprawnień!'); return; }
     if (!window.currentEditingPaintRules) return;
     const pt = paintTypes.find(p => p.id === window.currentEditingPaintRules);
     if (!pt) return;
@@ -406,12 +440,14 @@ export function savePaintRules() {
         else delete pt.fallbacks[color];
     });
     
+    pt.lastModified = Date.now();
+    
     if (window.closePaintRulesModal) window.closePaintRulesModal();
     renderPaintTypesTable(); updatePaintDropdowns(); calculate();
     if(window.updateAllStocks) window.updateAllStocks(); 
     if(window.renderDailySidebar) window.renderDailySidebar();
     if(window.renderDailyLedger) window.renderDailyLedger();
-    autoSaveToDisk(true);
+    dbSet(dbRef(firebaseDb, 'appState/paintTypes'), paintTypes);
 }
 
 export function getInduscoPaintsHtml() {
@@ -645,7 +681,7 @@ export function calculate() {
     }
     
     if (window.updateProtocolDateVisuals) window.updateProtocolDateVisuals();
-    calculateCosts(); autoSaveToDisk();
+    calculateCosts(); 
 }
 
 export function calculateCosts() {

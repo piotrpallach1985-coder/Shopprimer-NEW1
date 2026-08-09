@@ -4,10 +4,10 @@ import {
     inputData, resultsData, printHistory, projectsList, archivedProjectsList, 
     induscoHistory, induscoDailyRecords, activeRemanentAlerts, activeInduscoRequests, 
     database, paintTypes, laborCosts, userPreferences, usersList, protocolCounter,
-    setInputData, setUserPreferences, setUsersList, autoSaveToDisk 
+    setInputData, setUserPreferences, setUsersList 
 } from './store.js';
 
-import { currentUser } from './auth.js';
+import { currentUser, firebaseDb, dbRef, dbSet } from './auth.js';
 import { AVAILABLE_TABS } from './config.js';
 import { formatNumber, escapeHTML, parsePlDateToISO, formatISOToPL, parsePlDate } from './utils.js';
 
@@ -124,8 +124,9 @@ export function applyUserPermissions() {
     let allowed = [];
     
     if (dbUser.role === 'admin') {
-        // Admin widzi wszystkie moduły ORAZ zakładkę z ustawieniami ("users")
-        allowed = [...allStandardTabs, 'users'];
+        // Admin widzi wybrane zakladki ORAZ zakładkę z ustawieniami ("users") na sztywno
+        const selectedTabs = (dbUser.allowedTabs && dbUser.allowedTabs.length > 0) ? dbUser.allowedTabs : allStandardTabs;
+        allowed = [...selectedTabs, 'users'];
     } else {
         // Zwykły użytkownik widzi tylko to, co nadano mu w panelu (albo domyślne moduły)
         allowed = dbUser.allowedTabs || allStandardTabs;
@@ -168,6 +169,15 @@ export function applyUserPermissions() {
     if (targetTab && window.switchTab) {
         window.switchTab(targetTab, true);
     }
+
+    const btnInduscoReq = document.getElementById('btnInduscoReqMain');
+    if (btnInduscoReq) {
+        if (dbUser.hideInduscoReq === true) {
+            btnInduscoReq.classList.add('hidden');
+        } else {
+            btnInduscoReq.classList.remove('hidden');
+        }
+    }
 }
 
 export function renderUserPreferences() {
@@ -197,7 +207,7 @@ export function renderUsersTable() {
         const tr = document.createElement('tr');
         tr.className = "hover:bg-gray-100 transition-colors";
         
-        let actionBtn = isAdmin ? `<button onclick="editUser('${u.login}')" class="text-white bg-blue-600 font-bold border border-black px-2 py-0.5 text-[10px] uppercase hover:bg-blue-800">Edytuj</button>` : '-';
+        let actionBtn = isAdmin ? `<button onclick="editUser('${u.login}')" class="text-white bg-blue-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-blue-800 leading-none">EDYTUJ</button>` : '-';
         
         tr.innerHTML = `
             <td class="px-3 py-2 border-r border-b border-black font-bold">${escapeHTML(u.login)}</td>
@@ -219,6 +229,35 @@ export function editUser(login) {
     
     const adminCb = document.getElementById('editUserAdmin');
     adminCb.checked = u.role === 'admin';
+
+    const calcCanAcceptCb = document.getElementById('editUserCalcCanAccept');
+    const calcCanEditBeforeCb = document.getElementById('editUserCalcCanEditBefore');
+    const calcCanEditAfterCb = document.getElementById('editUserCalcCanEditAfter');
+    const calcCanDeleteCb = document.getElementById('editUserCalcCanDelete');
+
+    const indCanAcceptCb = document.getElementById('editUserIndCanAccept');
+    const indCanEditBeforeCb = document.getElementById('editUserIndCanEditBefore');
+    const indCanEditAfterCb = document.getElementById('editUserIndCanEditAfter');
+    const indCanDeleteCb = document.getElementById('editUserIndCanDelete');
+    
+    const hideInduscoReqCb = document.getElementById('editUserHideInduscoReq');
+
+    // Kompatybilność wsteczna z poprzednim systemem
+    const fallbackCanEdit = u.canEdit !== false;
+    const fallbackCanDelete = u.canDelete !== false;
+    const fallbackCanAccept = u.canAccept !== false;
+
+    if(calcCanAcceptCb) calcCanAcceptCb.checked = (u.calcCanAccept !== undefined) ? u.calcCanAccept : fallbackCanAccept;
+    if(calcCanEditBeforeCb) calcCanEditBeforeCb.checked = (u.calcCanEditBefore !== undefined) ? u.calcCanEditBefore : fallbackCanEdit;
+    if(calcCanEditAfterCb) calcCanEditAfterCb.checked = (u.calcCanEditAfter !== undefined) ? u.calcCanEditAfter : false; // domyślnie false (tylko admin miał wcześniej dostęp)
+    if(calcCanDeleteCb) calcCanDeleteCb.checked = (u.calcCanDelete !== undefined) ? u.calcCanDelete : fallbackCanDelete;
+
+    if(indCanAcceptCb) indCanAcceptCb.checked = (u.indCanAccept !== undefined) ? u.indCanAccept : fallbackCanAccept;
+    if(indCanEditBeforeCb) indCanEditBeforeCb.checked = (u.indCanEditBefore !== undefined) ? u.indCanEditBefore : fallbackCanEdit;
+    if(indCanEditAfterCb) indCanEditAfterCb.checked = (u.indCanEditAfter !== undefined) ? u.indCanEditAfter : false;
+    if(indCanDeleteCb) indCanDeleteCb.checked = (u.indCanDelete !== undefined) ? u.indCanDelete : fallbackCanDelete;
+
+    if(hideInduscoReqCb) hideInduscoReqCb.checked = u.hideInduscoReq === true;
     
     // Generowanie siatki zakładek w oknie edycji (tylko moduły bez sekcji ustawień)
     const tabsContainer = document.getElementById('editUserTabsGrid');
@@ -253,22 +292,47 @@ export async function saveEditUser() {
     u.name = document.getElementById('editUserName').value.trim();
     u.role = document.getElementById('editUserAdmin').checked ? 'admin' : 'user';
 
+    const calcCanAcceptCb = document.getElementById('editUserCalcCanAccept');
+    const calcCanEditBeforeCb = document.getElementById('editUserCalcCanEditBefore');
+    const calcCanEditAfterCb = document.getElementById('editUserCalcCanEditAfter');
+    const calcCanDeleteCb = document.getElementById('editUserCalcCanDelete');
+
+    const indCanAcceptCb = document.getElementById('editUserIndCanAccept');
+    const indCanEditBeforeCb = document.getElementById('editUserIndCanEditBefore');
+    const indCanEditAfterCb = document.getElementById('editUserIndCanEditAfter');
+    const indCanDeleteCb = document.getElementById('editUserIndCanDelete');
+    
+    const hideInduscoReqCb = document.getElementById('editUserHideInduscoReq');
+
+    if(calcCanAcceptCb) u.calcCanAccept = calcCanAcceptCb.checked;
+    if(calcCanEditBeforeCb) u.calcCanEditBefore = calcCanEditBeforeCb.checked;
+    if(calcCanEditAfterCb) u.calcCanEditAfter = calcCanEditAfterCb.checked;
+    if(calcCanDeleteCb) u.calcCanDelete = calcCanDeleteCb.checked;
+
+    if(indCanAcceptCb) u.indCanAccept = indCanAcceptCb.checked;
+    if(indCanEditBeforeCb) u.indCanEditBefore = indCanEditBeforeCb.checked;
+    if(indCanEditAfterCb) u.indCanEditAfter = indCanEditAfterCb.checked;
+    if(indCanDeleteCb) u.indCanDelete = indCanDeleteCb.checked;
+
+    if(hideInduscoReqCb) u.hideInduscoReq = hideInduscoReqCb.checked;
+
     // Zbieramy zaznaczone uprawnienia do zakładek (tylko z dostępnych pól wyboru)
     const checkboxes = document.querySelectorAll('.edit-user-tab-cb');
     if (checkboxes.length > 0) {
         u.allowedTabs = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
     }
+    
+    u.lastModified = Date.now();
 
     renderUsersTable();
     
     // Odświeżenie uprawnień od razu w interfejsie, jeśli admin edytuje samego siebie
     if (currentUser && currentUser.login === u.login) {
-        currentUser.role = u.role;
-        currentUser.allowedTabs = u.allowedTabs;
+        Object.assign(currentUser, u);
         applyUserPermissions();
     }
     
-    if (window.autoSaveToDisk) window.autoSaveToDisk(true);
+    dbSet(dbRef(firebaseDb, 'appState/appUsers'), usersList);
     closeEditUserModal();
     await customAlert("Zapisano zmiany uprawnień użytkownika.");
 }
@@ -287,7 +351,22 @@ export async function addNewUser() {
 
     const allTabs = AVAILABLE_TABS.map(t => t.id);
     
-    const newUsers = [...usersList, { login, name, role: isAdmin ? 'admin' : 'user', allowedTabs: allTabs }];
+    const newUsers = [...usersList, { 
+        login, 
+        name, 
+        role: isAdmin ? 'admin' : 'user', 
+        allowedTabs: allTabs,
+        calcCanAccept: true,
+        calcCanEditBefore: true,
+        calcCanEditAfter: false,
+        calcCanDelete: true,
+        indCanAccept: true,
+        indCanEditBefore: true,
+        indCanEditAfter: false,
+        indCanDelete: true,
+        hideInduscoReq: false,
+        lastModified: Date.now()
+    }];
     setUsersList(newUsers);
 
     document.getElementById('formNewUserLogin').value = '';
@@ -295,7 +374,7 @@ export async function addNewUser() {
     document.getElementById('formNewUserAdmin').checked = false;
 
     renderUsersTable();
-    if (window.autoSaveToDisk) window.autoSaveToDisk(true);
+    dbSet(dbRef(firebaseDb, 'appState/appUsers'), newUsers);
     await customAlert("Dodano użytkownika do listy uprawnień.");
 }
 
@@ -305,22 +384,17 @@ export async function resetProtocolCounter() {
             let state = window.getProjectState();
             state.protocolCounter = 0;
         }
-        if (window.autoSaveToDisk) window.autoSaveToDisk();
+        dbSet(dbRef(firebaseDb, 'appState/protocolCounter'), 0);
         await customAlert("Numeracja kalkulacji została zresetowana.");
     }
 }
 
 export function toggleUserPermissionsGrid() {
-    const adminCb = document.getElementById('editUserAdmin');
+    // Kiedys funkcja blokowała pola dla adminów. Teraz admin też może sobie konfigurować co widzi.
     const container = document.getElementById('editUserPermissionsContainer');
-    if (adminCb && container) {
-        if (adminCb.checked) {
-            container.style.opacity = '0.5';
-            container.style.pointerEvents = 'none';
-        } else {
-            container.style.opacity = '1';
-            container.style.pointerEvents = 'auto';
-        }
+    if (container) {
+        container.style.opacity = '1';
+        container.style.pointerEvents = 'auto';
     }
 }
 

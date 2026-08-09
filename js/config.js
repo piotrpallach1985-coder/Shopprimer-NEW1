@@ -1,6 +1,7 @@
 // --- KONFIGURACJA I STAŁE ---
 
 export const USE_FIREBASE = true;
+export const ADMIN_PIN = "4321";
 
 export const firebaseConfig = {
     apiKey: "AIzaSyAJ8-pGXq4atQMzEQJLXCdzyMggvotDOOM",

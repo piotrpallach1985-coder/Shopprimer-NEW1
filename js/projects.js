@@ -1,7 +1,8 @@
 // --- MODUŁ ZARZĄDZANIA PROJEKTAMI I ARCHIWUM (PROJECTS.JS) ---
 
 import { formatNumber, escapeHTML, parsePlDate } from './utils.js';
-import { projectsList, archivedProjectsList, printHistory, autoSaveToDisk } from './store.js';
+import { projectsList, archivedProjectsList, printHistory } from './store.js';
+import { firebaseDb, dbRef, dbSet } from './auth.js';
 
 export function getProjectStats(projectName) {
     let stats = { area: 0, paint: 0, thinner: 0, cost: 0 };
@@ -96,7 +97,7 @@ export async function addProject() {
         document.getElementById('formNewProjectName').value = '';
         renderProjectsList(); 
         if(window.renderInduscoTable) window.renderInduscoTable(); 
-        autoSaveToDisk();
+        dbSet(dbRef(firebaseDb, 'appState/projectsList'), projectsList);
     } else { await window.customAlert('Projekt już istnieje na liście (lub w archiwum)!'); }
 }
 
@@ -106,7 +107,7 @@ export async function removeProject(index) {
         projectsList.splice(index, 1); 
         renderProjectsList(); 
         if(window.renderInduscoTable) window.renderInduscoTable(); 
-        autoSaveToDisk();
+        dbSet(dbRef(firebaseDb, 'appState/projectsList'), projectsList);
     }
 }
 
@@ -147,7 +148,8 @@ export async function archiveProject(index) {
         projectsList.splice(index, 1);
         renderProjectsList(); renderArchiveList(); 
         if(window.renderInduscoTable) window.renderInduscoTable(); 
-        autoSaveToDisk();
+        dbSet(dbRef(firebaseDb, 'appState/projectsList'), projectsList);
+        dbSet(dbRef(firebaseDb, 'appState/archivedProjectsList'), archivedProjectsList);
     }
 }
 
@@ -159,7 +161,8 @@ export async function unarchiveProject(index) {
         archivedProjectsList.splice(index, 1);
         renderProjectsList(); renderArchiveList(); 
         if(window.renderInduscoTable) window.renderInduscoTable(); 
-        autoSaveToDisk();
+        dbSet(dbRef(firebaseDb, 'appState/projectsList'), projectsList);
+        dbSet(dbRef(firebaseDb, 'appState/archivedProjectsList'), archivedProjectsList);
     }
 }
 

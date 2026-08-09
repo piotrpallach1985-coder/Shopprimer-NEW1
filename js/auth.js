@@ -3,7 +3,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
-import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+import { getDatabase, ref, set, get, child, push, update, remove, onChildAdded, onChildChanged, onChildRemoved, onValue } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
 
 // Twoja oryginalna konfiguracja
 const firebaseConfig = {
@@ -28,6 +28,13 @@ export const firebaseDb = db;
 export const dbRef = ref;
 export const dbSet = set;
 export const dbGet = get;
+export const dbPush = push;
+export const dbUpdate = update;
+export const dbRemove = remove;
+export const dbOnChildAdded = onChildAdded;
+export const dbOnChildChanged = onChildChanged;
+export const dbOnChildRemoved = onChildRemoved;
+export const dbOnValue = onValue;
 
 // Zachowujemy zgodność z Twoim oryginalnym kodem (przypisania globalne)
 window.firebaseDb = db;
@@ -53,6 +60,14 @@ onAuthStateChanged(auth, async (user) => {
         if (!dataLoaded && window.loadDataFromFirebase) {
             await window.loadDataFromFirebase();
             dataLoaded = true;
+            try {
+                const storeModule = await import('./store.js');
+                if (storeModule.initFirebaseListeners) {
+                    storeModule.initFirebaseListeners();
+                }
+            } catch (e) {
+                console.warn("Nie udało się załadować nasłuchiwaczy z store.js:", e);
+            }
         }
 
         // Pobieramy bazę użytkowników dynamicznie (w locie), aby uniknąć błędu zapętlenia!
@@ -66,8 +81,9 @@ onAuthStateChanged(auth, async (user) => {
             console.warn("Nie udało się pobrać store.js dynamicznie:", e);
         }
 
-        // Tworzymy obiekt użytkownika
+        // Tworzymy obiekt użytkownika pobierając wszystkie pola z bazy (w tym uprawnienia)
         currentUser = {
+            ...(dbUser || {}),
             login: user.email,
             name: dbUser ? dbUser.name : (user.displayName || user.email.split('@')[0]), 
             role: dbUser ? dbUser.role : 'user', 

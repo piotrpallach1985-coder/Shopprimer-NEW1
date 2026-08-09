@@ -1,14 +1,14 @@
 // --- MODUŁ HISTORII KALKULACJI I WYDRUKÓW (HISTORY.JS) ---
 
 import { formatNumber, escapeHTML, formatISOToPL, parsePlDateToISO, parsePlDate } from './utils.js';
-import { shopPrimerRules } from './config.js';
+import { shopPrimerRules, ADMIN_PIN } from './config.js';
 import { 
     printHistory, inputData, resultsData, paintTypes, laborCosts, 
     archivedProjectsList, projectsList, protocolCounter, 
-    autoSaveToDisk, setInputData, setPrintHistory 
+    setInputData, setPrintHistory 
 } from './store.js';
 
-import { currentUser } from './auth.js';
+import { currentUser, firebaseDb, dbRef, dbSet } from './auth.js';
 
 export async function saveToSummaryInternal() {
     const dateInputVal = document.getElementById('protocolDateInput').value;
@@ -51,7 +51,7 @@ export async function saveToSummaryInternal() {
 
     let existingEntryIndex = window.editingProtocolId ? printHistory.findIndex(e => e.id.toString() === window.editingProtocolId.toString()) : -1;
 
-    const appliedRates = window.historicalRates ? window.historicalRates : {
+    const appliedRates = window.historicalRates ? JSON.parse(JSON.stringify(window.historicalRates)) : {
         laborCosts: JSON.parse(JSON.stringify(laborCosts)),
         paintTypes: JSON.parse(JSON.stringify(paintTypes))
     };
@@ -139,7 +139,9 @@ export async function saveToSummaryInternal() {
         if(window.renderDailySidebar) window.renderDailySidebar(); 
         if(window.renderDailyLedger) window.renderDailyLedger(); 
     }
-    autoSaveToDisk();
+    if (firebaseDb && dbSet && dbRef) {
+        dbSet(dbRef(firebaseDb, 'appState/printHistory'), printHistory);
+    }
 }
 
 export async function saveToSummary() {
@@ -197,7 +199,9 @@ export async function acceptCurrentPreview() {
         };
         
         setPrintHistory(newHistory);
-        autoSaveToDisk(true);
+        if (firebaseDb && dbSet && dbRef) {
+            dbSet(dbRef(firebaseDb, 'appState/printHistory'), newHistory);
+        }
         
         if (window.renderHistoryTable) window.renderHistoryTable();
         
@@ -231,7 +235,9 @@ export async function rejectCurrentPreview() {
         };
         
         setPrintHistory(newHistory);
-        autoSaveToDisk(true);
+        if (firebaseDb && dbSet && dbRef) {
+            dbSet(dbRef(firebaseDb, 'appState/printHistory'), newHistory);
+        }
         
         if (window.renderHistoryTable) window.renderHistoryTable();
         
@@ -247,7 +253,7 @@ export async function rejectCurrentPreview() {
     }
 }
 
-export async function loadHistoryItem(id, sourceTab = 'history') {
+export async function loadHistoryItem(id, sourceTab = 'history', actionType = 'view') {
     window.sourceTabForPreview = sourceTab;
     window.previewHistoryId = id; 
     const entry = printHistory.find(e => e.id.toString() === id.toString());
@@ -295,10 +301,13 @@ export async function loadHistoryItem(id, sourceTab = 'history') {
                 </div>
             `;
         } else {
-            uiContainer.innerHTML = `
-                <button onclick="acceptCurrentPreview()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-4 text-xs uppercase border border-black shadow-sm transition">POTWIERDŹ PRZYJĘCIE</button>
-                <button onclick="rejectCurrentPreview()" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-4 text-xs uppercase border border-black shadow-sm transition">ODRZUĆ (KOMENTARZ)</button>
-            `;
+            let btnsHtml = '';
+            if (actionType === 'accept') {
+                btnsHtml = `<button onclick="acceptCurrentPreview()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-4 text-xs uppercase border border-black shadow-sm transition">POTWIERDŹ PRZYJĘCIE</button>`;
+            } else if (actionType === 'reject') {
+                btnsHtml = `<button onclick="rejectCurrentPreview()" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-4 text-xs uppercase border border-black shadow-sm transition">ODRZUĆ (KOMENTARZ)</button>`;
+            } // If 'view', btnsHtml remains empty.
+            uiContainer.innerHTML = btnsHtml;
         }
         
         if (banner.lastElementChild) {
@@ -321,6 +330,19 @@ export async function loadHistoryItem(id, sourceTab = 'history') {
 export async function editHistoryItem(id, sourceTab = 'history') {
     const entry = printHistory.find(e => e.id.toString() === id.toString());
     if (!entry || !entry.items) { await window.customAlert("Brak szczegółów dla tej kalkulacji."); return; }
+    
+    if (entry.isAccepted) {
+        if (!currentUser || currentUser.role !== 'admin') {
+            await window.customAlert("Ta kalkulacja została zaakceptowana i jest zablokowana do edycji.");
+            return;
+        }
+        const pin = await window.customPrompt("Ta kalkulacja jest zaakceptowana. Podaj PIN aby ją edytować:", "password");
+        if (pin !== ADMIN_PIN) {
+            if (pin !== null) await window.customAlert("Nieprawidłowy kod PIN.");
+            return;
+        }
+    }
+
     if (inputData.length > 0) { if (!(await window.customConfirm("Otwarcie kalkulacji do EDYCJI zastąpi obecną, niezapisaną listę w Kalkulatorze. Kontynuować?"))) return; }
     
     window.sourceTabForPreview = sourceTab;
@@ -439,22 +461,14 @@ export function exitPreviewMode() {
     window.sourceTabForPreview = null;
 }
 
-export function toggleSelectAllHistory() {
-    const isChecked = document.getElementById('selectAllHistory').checked;
-    document.querySelectorAll('.history-checkbox').forEach(cb => cb.checked = isChecked);
-}
-
-export async function deleteSelectedHistoryItemsWithPin() {
-    if (!currentUser || currentUser.role !== 'admin') { await window.customAlert("Funkcja usuwania jest dostępna tylko dla administratora."); return; }
-    const selectedCheckboxes = document.querySelectorAll('.history-checkbox:checked');
-    if (selectedCheckboxes.length === 0) { await window.customAlert("Wybierz przynajmniej jedną kalkulację do usunięcia."); return; }
-
-    const pin = await window.customPrompt(`Podaj kod autoryzacji (PIN), aby usunąć ${selectedCheckboxes.length} zaznaczone kalkulacje:`, 'password');
-    if (pin === "4321") {
-        if(await window.customConfirm(`Czy na pewno chcesz usunąć ${selectedCheckboxes.length} wybrane kalkulacje? Tej operacji nie można cofnąć.`)) {
+export async function deleteHistoryItemWithPin(id) {
+    if (!currentUser || currentUser.role !== 'admin' || currentUser.canDelete === false) { await window.customAlert("Brak uprawnień do usuwania kalkulacji."); return; }
+    
+    const pin = await window.customPrompt("Podaj kod autoryzacji (PIN), aby usunąć kalkulację:", 'password');
+    if (pin === ADMIN_PIN) {
+        if(await window.customConfirm("Czy na pewno chcesz usunąć wybraną kalkulację? Tej operacji nie można cofnąć.")) {
             window.forceNextCloudOverwrite = true;
-            const idsToDelete = Array.from(selectedCheckboxes).map(cb => cb.value);
-            const newHistory = printHistory.filter(item => !idsToDelete.includes(item.id.toString()));
+            const newHistory = printHistory.filter(item => item.id.toString() !== id.toString());
             setPrintHistory(newHistory);
             
             renderHistoryTable(); 
@@ -465,8 +479,10 @@ export async function deleteSelectedHistoryItemsWithPin() {
                 if(window.renderDailySidebar) window.renderDailySidebar(); 
                 if(window.renderDailyLedger) window.renderDailyLedger(); 
             }
-            autoSaveToDisk(); 
-            await window.customAlert("Pomyślnie usunięto zaznaczone kalkulacje.");
+            if (firebaseDb && dbSet && dbRef) {
+                dbSet(dbRef(firebaseDb, 'appState/printHistory'), printHistory);
+            }
+            await window.customAlert("Pomyślnie usunięto kalkulację.");
         }
     } else if (pin !== null) await window.customAlert("Nieprawidłowy kod PIN.");
 }
@@ -482,21 +498,15 @@ export function renderHistoryTable() {
         }
     }
     if(!tbody || !theadTr) return;
-    const isAdmin = currentUser && currentUser.role === 'admin';
     
-    const checkboxTh = isAdmin ? `<th id="colHistCheck" class="px-3 py-2 border-r border-black print-hide text-center w-8 align-middle"><input type="checkbox" id="selectAllHistory" onchange="toggleSelectAllHistory()" class="cursor-pointer w-4 h-4"></th>` : '';
     const paintColsTh = paintTypes.map(pt => `<th class="px-3 py-2 border-r border-black text-right truncate max-w-[80px]" title="${pt.name}">${pt.name}[L]</th>`).join('');
 
-    theadTr.innerHTML = `${checkboxTh}<th class="px-3 py-2 border-r border-black">Nr Kalkulacji</th><th class="px-3 py-2 border-r border-black">Data</th><th class="px-3 py-2 border-r border-black">Jednostka</th><th class="px-3 py-2 border-r border-black text-right">Pow.[m²]</th>${paintColsTh}<th class="px-3 py-2 border-r border-black text-right">Rozc.[l]</th><th class="px-3 py-2 border-r border-black text-right">Koszty[PLN]</th><th class="px-3 py-2 border-r border-black">Autor & Akceptacja</th><th class="px-3 py-2 text-center print-hide">Akcja</th>`;
+    theadTr.innerHTML = `<th class="px-3 py-2 border-r border-black">Nr Kalkulacji</th><th class="px-3 py-2 border-r border-black">Data</th><th class="px-3 py-2 border-r border-black">Jednostka</th><th class="px-3 py-2 border-r border-black text-right">Pow.[m²]</th>${paintColsTh}<th class="px-3 py-2 border-r border-black text-right">Rozc.[l]</th><th class="px-3 py-2 border-r border-black text-right">Koszty[PLN]</th><th class="px-3 py-2 border-r border-black">Autor & Akceptacja</th><th class="px-3 py-2 text-center print-hide">Akcja</th>`;
 
-    const btnDeleteSel = document.getElementById('btnDeleteSelectedHistory');
-    if (btnDeleteSel) btnDeleteSel.style.display = isAdmin ? 'inline-block' : 'none';
-    const selectAllCb = document.getElementById('selectAllHistory');
-    if (selectAllCb) selectAllCb.checked = false;
     tbody.innerHTML = '';
 
     if(printHistory.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="${isAdmin ? 8 + paintTypes.length : 7 + paintTypes.length}" class="px-3 py-2 text-center text-black font-bold uppercase border-b border-black">Brak zapisanych kalkulacji.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${7 + paintTypes.length}" class="px-3 py-2 text-center text-black font-bold uppercase border-b border-black">Brak zapisanych kalkulacji.</td></tr>`;
         return;
     }
 
@@ -506,6 +516,8 @@ export function renderHistoryTable() {
     const fPaint = document.getElementById('histFilterPaint').value;
     const dFrom = fDateFromStr ? new Date(fDateFromStr) : new Date('1970-01-01'); dFrom.setHours(0,0,0,0);
     const dTo = fDateToStr ? new Date(fDateToStr) : new Date('2099-12-31'); dTo.setHours(23,59,59,999);
+    const fStatusEl = document.getElementById('historyFilterStatus');
+    const fStatus = fStatusEl ? fStatusEl.value : 'ALL';
 
     const filteredHistory = printHistory.filter(row => {
         const rowDate = parsePlDate(row.date);
@@ -515,11 +527,16 @@ export function renderHistoryTable() {
         if (fPaint && fPaint !== 'Wszystkie') {
             if (!row.brandStats || !row.brandStats[fPaint] || row.brandStats[fPaint].vol <= 0) return false;
         }
+        if (fStatus !== 'ALL') {
+            if (fStatus === 'ZAAKCEPTOWANO' && !row.isAccepted) return false;
+            if (fStatus === 'ODRZUCONO' && (!row.rejectionComment || row.isAccepted)) return false;
+            if (fStatus === 'OCZEKUJE' && (row.isAccepted || row.rejectionComment)) return false;
+        }
         return true;
     });
 
     const historyToDisplay = [...filteredHistory].reverse();
-    if(historyToDisplay.length === 0) { tbody.innerHTML = `<tr><td colspan="${isAdmin ? 8 + paintTypes.length : 7 + paintTypes.length}" class="px-3 py-2 text-center text-black font-bold uppercase border-b border-black">Brak wyników.</td></tr>`; return; }
+    if(historyToDisplay.length === 0) { tbody.innerHTML = `<tr><td colspan="${7 + paintTypes.length}" class="px-3 py-2 text-center text-black font-bold uppercase border-b border-black">Brak wyników.</td></tr>`; return; }
 
     let html = '';
     historyToDisplay.forEach(row => {
@@ -527,25 +544,49 @@ export function renderHistoryTable() {
 
         const safeProtocol = escapeHTML(row.protocolNumber || '-');
         const safeProject = escapeHTML(row.projectName || '-');
-
-        const trClass = row.isError ? "bg-gray-200 text-gray-500 line-through" : "hover:bg-gray-100 transition-colors";
-        const checkboxCell = isAdmin ? `<td class="px-2 py-1.5 border-r border-b border-black text-center print-hide w-8 align-middle"><input type="checkbox" class="history-checkbox cursor-pointer w-4 h-4" value="${row.id}"></td>` : '';
+        let trClass = row.isError ? "bg-gray-200 text-gray-500 line-through border-b border-gray-300" : "hover:bg-gray-100 transition-colors border-b border-gray-300";
+        if (!row.isError) {
+            if (row.isAccepted) trClass = "bg-green-50 hover:bg-green-100 transition-colors";
+            else if (row.rejectionComment) trClass = "bg-red-200 hover:bg-red-300 transition-colors";
+        }
+        
         let paintColsHtml = paintTypes.map(pt => `<td class="px-3 py-1.5 border-r border-b border-black text-right font-bold">${formatNumber(bs[pt.id] ? bs[pt.id].vol : 0, 2)}</td>`).join('');
         let thTotal = 0; paintTypes.forEach(pt => { if(bs[pt.id]) thTotal += bs[pt.id].thinner || 0; });
         if (row.thinnerVol && thTotal === 0) thTotal = row.thinnerVol; 
 
-        let actionsHtml = `<div class="flex flex-col gap-1 items-stretch w-16 mx-auto"><button onclick="loadHistoryItem('${row.id}', 'history')" class="text-black font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-black hover:text-white bg-white leading-none">PODGLĄD</button><button onclick="editHistoryItem('${row.id}', 'history')" class="text-white bg-blue-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-blue-800 leading-none">EDYTUJ</button></div>`;
+        let actionsHtml = `<div class="flex flex-col gap-1 items-stretch w-16 mx-auto"><button onclick="loadHistoryItem('${row.id}', 'history', 'view')" class="text-black font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-black hover:text-white bg-white leading-none">PODGLĄD</button>`;
+        
+        const canEditBefore = currentUser && currentUser.calcCanEditBefore !== false;
+        const canEditAfter = currentUser && currentUser.calcCanEditAfter === true;
+        const canEdit = currentUser && (currentUser.role === 'admin' || (!row.isAccepted ? canEditBefore : canEditAfter));
+
+        if (canEdit) {
+            actionsHtml += `<button onclick="editHistoryItem('${row.id}', 'history')" class="text-white bg-blue-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-blue-800 leading-none">EDYTUJ</button>`;
+        }
+
+        if (currentUser && (currentUser.role === 'admin' || currentUser.calcCanAccept)) {
+            if (!row.isAccepted && !row.rejectionComment) {
+                actionsHtml += `<button onclick="loadHistoryItem('${row.id}', 'history', 'accept')" class="text-white bg-green-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-green-700 leading-none">POTWIERDŹ</button>`;
+                actionsHtml += `<button onclick="loadHistoryItem('${row.id}', 'history', 'reject')" class="text-white bg-red-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-red-700 leading-none">ODRZUĆ</button>`;
+            }
+        }
+        
+        if (currentUser && (currentUser.role === 'admin' || currentUser.calcCanDelete !== false)) {
+            actionsHtml += `<button onclick="deleteHistoryItemWithPin('${row.id}')" class="text-black font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-black hover:text-white bg-white leading-none mt-1">USUŃ</button>`;
+        }
+
+        actionsHtml += `</div>`;
 
         let authorHtml = `<div class="whitespace-normal">${row.author || '-'}</div>`;
         if (row.isAccepted) {
-            authorHtml += `<div class="mt-1 text-[9px] text-green-700 font-bold uppercase border-t border-green-300 pt-0.5">ZAAKCEPTOWAŁ(A):<br>${escapeHTML(row.acceptedBy)}</div>`;
+            authorHtml += `<div class="mt-1 text-[9px] text-green-700 font-bold uppercase border-t border-green-300 pt-0.5">ZAAKCEPTOWANO:<br>${escapeHTML(row.acceptedBy || '-')}</div>`;
         } else if (row.rejectionComment) {
             authorHtml += `<div class="mt-1 text-[9px] text-red-700 font-bold border-t border-red-300 pt-0.5" title="${escapeHTML(row.rejectionComment)}"><span class="uppercase">ODRZUCONO:</span><br><span class="font-normal italic">${escapeHTML(row.rejectionComment)}</span></div>`;
         } else {
             authorHtml += `<div class="mt-1 text-[9px] text-orange-600 font-bold uppercase border-t border-orange-300 pt-0.5">OCZEKUJE</div>`;
         }
 
-        html += `<tr class="${trClass}">${checkboxCell}<td class="px-3 py-1.5 border-r border-b border-black font-bold">${safeProtocol}</td><td class="px-3 py-1.5 border-r border-b border-black font-bold">${row.date}</td><td class="px-3 py-1.5 border-r border-b border-black font-bold uppercase">${safeProject}</td><td class="px-3 py-1.5 border-r border-b border-black text-right"><div class="font-bold">${formatNumber(row.area, 2)}</div><div class="text-[9px] text-gray-600 uppercase mt-0.5 whitespace-nowrap">B: ${formatNumber(row.areaBlachy, 2)} | P: ${formatNumber(row.areaProfile, 2)}</div></td>${paintColsHtml}<td class="px-3 py-1.5 border-r border-b border-black text-right font-bold">${formatNumber(thTotal, 2)}</td><td class="px-3 py-1.5 border-r border-b border-black text-right font-bold">${formatNumber(row.cost, 2)}</td><td class="px-3 py-1.5 border-r border-b border-black text-[10px] align-middle">${authorHtml}</td><td class="px-2 py-1.5 border-b border-black text-center print-hide no-underline align-middle">${actionsHtml}</td></tr>`;
+        html += `<tr class="${trClass}"><td class="px-3 py-1.5 border-r border-b border-black font-bold">${safeProtocol}</td><td class="px-3 py-1.5 border-r border-b border-black font-bold">${row.date}</td><td class="px-3 py-1.5 border-r border-b border-black font-bold uppercase">${safeProject}</td><td class="px-3 py-1.5 border-r border-b border-black text-right"><div class="font-bold">${formatNumber(row.area, 2)}</div><div class="text-[9px] text-gray-600 uppercase mt-0.5 whitespace-nowrap">B: ${formatNumber(row.areaBlachy, 2)} | P: ${formatNumber(row.areaProfile, 2)}</div></td>${paintColsHtml}<td class="px-3 py-1.5 border-r border-b border-black text-right font-bold">${formatNumber(thTotal, 2)}</td><td class="px-3 py-1.5 border-r border-b border-black text-right font-bold">${formatNumber(row.cost, 2)}</td><td class="px-3 py-1.5 border-r border-b border-black text-[10px] align-middle">${authorHtml}</td><td class="px-2 py-1.5 border-b border-black text-center print-hide no-underline align-middle">${actionsHtml}</td></tr>`;
     });
 
     tbody.innerHTML = html;
@@ -616,8 +657,7 @@ window.cancelEditProtocol = cancelEditProtocol;
 window.exitPreviewMode = exitPreviewMode;
 window.acceptCurrentPreview = acceptCurrentPreview;
 window.rejectCurrentPreview = rejectCurrentPreview;
-window.toggleSelectAllHistory = toggleSelectAllHistory;
-window.deleteSelectedHistoryItemsWithPin = deleteSelectedHistoryItemsWithPin;
+window.deleteHistoryItemWithPin = deleteHistoryItemWithPin;
 window.renderHistoryTable = renderHistoryTable;
 window.exportHistoryToExcel = exportHistoryToExcel;
 

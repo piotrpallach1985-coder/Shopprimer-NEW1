@@ -215,6 +215,55 @@
                         <!-- Wyświetlane dynamicznie -->
                     </div>
                 </div>
+
+                <div id="editUserActionsContainer" class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div class="border border-black p-2 bg-gray-50">
+                        <label class="block text-xs font-bold text-black mb-2 uppercase border-b border-gray-300 pb-1">Kalkulacje (Zestawienia)</label>
+                        <div class="space-y-1.5">
+                            <label class="flex items-center gap-2 cursor-pointer bg-white p-1.5 border border-black hover:bg-gray-100">
+                                <input type="checkbox" id="editUserCalcCanAccept" class="w-4 h-4 cursor-pointer" checked>
+                                <span class="text-[11px] font-bold uppercase">Przycisk Akceptuj/Odrzuć</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer bg-white p-1.5 border border-black hover:bg-gray-100">
+                                <input type="checkbox" id="editUserCalcCanEditBefore" class="w-4 h-4 cursor-pointer" checked>
+                                <span class="text-[11px] font-bold uppercase">Edycja PRZED akceptacją</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer bg-white p-1.5 border border-black hover:bg-gray-100">
+                                <input type="checkbox" id="editUserCalcCanEditAfter" class="w-4 h-4 cursor-pointer">
+                                <span class="text-[11px] font-bold uppercase">Edycja PO akceptacji</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer bg-white p-1.5 border border-black hover:bg-gray-100">
+                                <input type="checkbox" id="editUserCalcCanDelete" class="w-4 h-4 cursor-pointer" checked>
+                                <span class="text-[11px] font-bold uppercase">Usuwanie wpisów</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="border border-black p-2 bg-gray-50">
+                        <label class="block text-xs font-bold text-black mb-2 uppercase border-b border-gray-300 pb-1">Farby (Indusco)</label>
+                        <div class="space-y-1.5">
+                            <label class="flex items-center gap-2 cursor-pointer bg-white p-1.5 border border-black hover:bg-gray-100">
+                                <input type="checkbox" id="editUserIndCanAccept" class="w-4 h-4 cursor-pointer" checked>
+                                <span class="text-[11px] font-bold uppercase">Przycisk Akceptuj/Odrzuć</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer bg-white p-1.5 border border-black hover:bg-gray-100">
+                                <input type="checkbox" id="editUserIndCanEditBefore" class="w-4 h-4 cursor-pointer" checked>
+                                <span class="text-[11px] font-bold uppercase">Edycja PRZED akceptacją</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer bg-white p-1.5 border border-black hover:bg-gray-100">
+                                <input type="checkbox" id="editUserIndCanEditAfter" class="w-4 h-4 cursor-pointer">
+                                <span class="text-[11px] font-bold uppercase">Edycja PO akceptacji</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer bg-white p-1.5 border border-black hover:bg-gray-100">
+                                <input type="checkbox" id="editUserIndCanDelete" class="w-4 h-4 cursor-pointer" checked>
+                                <span class="text-[11px] font-bold uppercase">Usuwanie wpisów</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer bg-white p-1.5 border border-black hover:bg-gray-100">
+                                <input type="checkbox" id="editUserHideInduscoReq" class="w-4 h-4 cursor-pointer">
+                                <span class="text-[11px] font-bold uppercase">Ukryj przycisk Zapotrzebowanie</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="flex justify-end gap-3 shrink-0 pt-2 border-t border-gray-300">
                 <button onclick="closeEditUserModal()" class="bg-gray-200 text-black border border-black hover:bg-gray-300 font-bold py-2 px-4 uppercase text-sm transition">Anuluj</button>
@@ -260,7 +309,7 @@
 
     <!-- MODAL RAPORT FARB -->
     <div id="paintReportModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 z-[3500] hidden items-center justify-center print-hide">
-        <div class="bg-white border-2 border-black p-6 w-full max-w-4xl shadow-2xl relative flex flex-col max-h-[90vh]">
+        <div class="bg-white border-2 border-black p-6 w-full max-w-6xl shadow-2xl relative flex flex-col max-h-[90vh]">
             <h2 class="text-lg font-bold text-black uppercase border-b-2 border-black pb-2 mb-4 flex justify-between items-center">
                 <span>Raport Miesięczny (Zużycie Farb)</span>
                 <span class="text-sm font-normal print-date-paint-report"></span>
@@ -279,7 +328,9 @@
                             <th class="px-3 py-2 border-r border-black">Rodzaj Farby</th>
                             <th class="px-3 py-2 border-r border-black text-right">Zużycie Farby [L]</th>
                             <th class="px-3 py-2 border-r border-black text-right">Rozcieńczalnik [L]</th>
-                            <th class="px-3 py-2 text-right">Suma Zużycia [L]</th>
+                            <th class="px-3 py-2 border-r border-black text-right">% Zużycia</th>
+                            <th class="px-3 py-2 border-r border-black text-right">Suma Zużycia [L]</th>
+                            <th class="px-3 py-2 text-right">Koszt [PLN]</th>
                         </tr>
                     </thead>
                     <tbody id="paintReportTableBody" class="divide-y divide-black bg-white"></tbody>
@@ -300,8 +351,8 @@
             <div>
                 <h1 class="text-xl md:text-2xl font-bold text-black flex items-center gap-2 uppercase tracking-wide">
                     SHOPPRIMER <span class="bg-black text-white px-2 py-0.5 text-sm ml-2">WEB v.2.1 TEST</span>
-                    <span id="welcomeMessage" class="hidden text-sm font-normal normal-case text-gray-600 ml-2 print-hide">
-                        WITAJ: <span id="loggedUserName" class="font-bold text-black uppercase"></span>
+                    <span id="welcomeMessage" class="text-sm font-bold normal-case text-gray-700 ml-2 print-hide">
+                        <span id="loggedUserName" class="uppercase"></span>
                     </span>
                 </h1>
                 <!-- STATUS SYNCHRONIZACJI Z CHMURĄ -->
@@ -310,7 +361,7 @@
                 </div>
             </div>
             <div class="flex flex-wrap gap-2 print-hide items-center">
-                <button onclick="openInduscoRequestModal()" class="bg-blue-600 text-white border border-black hover:bg-blue-700 px-3 py-2 text-[10px] font-bold transition flex items-center gap-1.5 uppercase shadow-sm whitespace-nowrap">
+                <button id="btnInduscoReqMain" onclick="openInduscoRequestModal()" class="bg-blue-600 text-white border border-black hover:bg-blue-700 px-3 py-2 text-[10px] font-bold transition flex items-center gap-1.5 uppercase shadow-sm whitespace-nowrap">
                     ZAPOTRZEBOWANIE INDUSCO
                 </button>
                 <button onclick="openNotificationsModal()" id="notificationBell" class="relative bg-white border border-black hover:bg-gray-100 p-2 text-black transition flex items-center justify-center shadow-sm" title="Powiadomienia">
@@ -365,7 +416,7 @@
 
         <!-- WIDOK: ROZLICZENIE DZIENNE -->
         <div id="view-daily" class="space-y-4 block mt-4">
-            <div class="flex flex-col md:flex-row gap-4 h-[calc(100vh-220px)] min-h-[500px]">
+            <div class="flex flex-col md:flex-row gap-4">
                 <!-- Sidebar Farb -->
                 <div id="dailyPaintSidebarWrapper" class="w-full md:w-56 bg-white border border-black flex-shrink-0 flex flex-col print-hide transition-all duration-300">
                     <div class="bg-gray-100 p-2 font-bold text-sm border-b border-black flex justify-between items-center gap-2">
@@ -379,7 +430,7 @@
                 </div>
 
                 <!-- Główna zawartość Rozliczenia -->
-                <div class="flex-1 bg-white border border-black flex flex-col overflow-hidden">
+                <div class="flex-1 bg-white border border-black flex flex-col">
                     <div class="p-3 border-b border-black flex flex-wrap justify-between items-center bg-gray-50 gap-2 print-hide">
                         <div class="flex items-center gap-4">
                             <button onclick="toggleDailySidebar()" class="border border-black px-3 py-1 bg-yellow-400 hover:bg-yellow-500 text-black font-bold text-xs uppercase shadow-sm transition-colors flex items-center gap-1">
@@ -396,12 +447,21 @@
                                 <input type="month" id="dailyMonthInput" onchange="renderDailyLedger()" class="border border-black p-1 text-xs outline-none bg-white font-bold cursor-pointer hover:bg-gray-100">
                                 <button onclick="changeDailyMonth(1)" class="border border-black px-2 py-1 text-xs font-bold bg-white hover:bg-gray-200 transition">&gt;</button>
                             </div>
+                            <div class="flex items-center gap-1 ml-2">
+                                <label class="text-[10px] font-bold uppercase mr-1">Status:</label>
+                                <select id="dailyFilterStatus" onchange="renderDailyLedger()" class="border border-black p-1 text-xs outline-none bg-white font-normal cursor-pointer hover:bg-gray-100">
+                                    <option value="ALL">WSZYSTKIE</option>
+                                    <option value="OCZEKUJE">Oczekuje</option>
+                                    <option value="ZAAKCEPTOWANO">Zaakceptowano</option>
+                                    <option value="ODRZUCONO">Odrzucono</option>
+                                </select>
+                            </div>
                             <button onclick="openMonthlyReportModal()" class="border border-black px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase shadow-sm transition-colors ml-2">RAPORT MIESIĘCZNY (M2)</button>
                             <button onclick="openPaintReportModal()" class="border border-black px-3 py-1 bg-green-600 hover:bg-green-700 text-white font-bold text-xs uppercase shadow-sm transition-colors ml-2">RAPORT FARB</button>
                             <button onclick="printDailyLedger()" class="bg-black text-white px-3 py-1 font-bold text-xs uppercase shadow-md hover:bg-gray-800 ml-2">DRUKUJ (PDF)</button>
                         </div>
                     </div>
-                    <div class="overflow-auto flex-1 p-0">
+                    <div class="flex-1 p-0">
                         <table class="w-full text-center text-[11px] md:text-xs whitespace-nowrap bg-white">
                             <thead class="bg-gray-100 text-black font-bold uppercase sticky top-0 border-b-2 border-black z-10">
                                 <tr>
@@ -427,7 +487,7 @@
 
         <!-- WIDOK: ROZLICZENIE DZIENNE INDUSCO -->
         <div id="view-daily-indusco" class="space-y-4 hidden mt-4">
-            <div class="flex flex-col md:flex-row gap-4 h-[calc(100vh-220px)] min-h-[500px]">
+            <div class="flex flex-col md:flex-row gap-4">
                 <!-- Sidebar Farb Indusco -->
                 <div id="dailyInduscoSidebarWrapper" class="w-full md:w-56 bg-white border border-black flex-shrink-0 flex flex-col print-hide transition-all duration-300">
                     <div class="bg-gray-100 p-2 font-bold text-sm border-b border-black flex justify-between items-center gap-2">
@@ -440,7 +500,7 @@
                 </div>
 
                 <!-- Główna zawartość Rozliczenia Indusco -->
-                <div class="flex-1 bg-white border border-black flex flex-col overflow-hidden">
+                <div class="flex-1 bg-white border border-black flex flex-col">
                     <div class="p-3 border-b border-black flex flex-wrap justify-between items-center bg-gray-50 gap-2 print-hide">
                         <div class="flex items-center gap-4">
                             <button onclick="document.getElementById('dailyInduscoSidebarWrapper').classList.toggle('hidden'); document.getElementById('dailyInduscoSidebarWrapper').classList.toggle('flex');" class="border border-black px-3 py-1 bg-yellow-400 hover:bg-yellow-500 text-black font-bold text-xs uppercase shadow-sm transition-colors flex items-center gap-1">
@@ -459,7 +519,7 @@
                             <button onclick="document.body.classList.add('print-daily-indusco'); window.print(); document.body.classList.remove('print-daily-indusco');" class="bg-black text-white px-3 py-1 font-bold text-xs uppercase shadow-md hover:bg-gray-800 ml-2">DRUKUJ (PDF)</button>
                         </div>
                     </div>
-                    <div class="overflow-auto flex-1 p-0">
+                    <div class="flex-1 p-0">
                         <table class="w-full text-center text-[11px] md:text-xs whitespace-nowrap bg-white">
                             <thead class="bg-gray-100 text-black font-bold uppercase sticky top-0 border-b-2 border-black z-10">
                                 <tr>
@@ -535,8 +595,8 @@
                 <button onclick="exitPreviewMode()" class="bg-red-600 text-white border border-red-800 px-4 py-1.5 font-bold text-xs uppercase hover:bg-red-700 transition shadow-md">Zakończ podgląd</button>
             </div>
 
-            <div id="addFormContainer" class="bg-white p-2 border border-black print-hide">
-                <h2 class="text-sm font-bold text-black mb-1.5 border-b border-black pb-0.5 uppercase">Dodaj element(y)</h2>
+            <div id="addFormContainer" class="bg-blue-50 p-2 border border-black print-hide">
+                <h2 class="text-sm font-bold text-white bg-blue-600 px-2 py-1.5 mb-1.5 uppercase border border-black shadow-sm">Dodaj element(y)</h2>
                 <div class="space-y-1.5">
                     <div class="flex flex-wrap gap-1.5 items-end">
                         <div class="w-full sm:w-[130px]">
@@ -635,7 +695,7 @@
                     </div>
                 </div>
                 
-                <div class="overflow-x-auto max-h-[500px] overflow-y-auto w-full">
+                <div class="overflow-x-auto w-full">
                     <table class="w-full text-left text-[10px] xl:text-[11px] table-auto">
                         <thead class="bg-white text-black font-bold sticky top-0 z-10 uppercase border-b-2 border-black whitespace-nowrap">
                             <tr>
@@ -662,9 +722,6 @@
                 <div id="tableActionsContainer" class="p-3 border-t border-black bg-gray-50 flex justify-end gap-3 print-hide">
                     <button id="btnCancelEdit" onclick="cancelEditProtocol()" class="bg-gray-200 text-black border border-black hover:bg-gray-300 px-4 py-2 text-sm font-bold transition flex items-center gap-1.5 uppercase hidden">
                         Anuluj
-                    </button>
-                    <button id="btnPrintProtocol" onclick="printProtocol()" class="bg-white border border-black hover:bg-black hover:text-white text-black px-4 py-2 text-sm font-bold transition flex items-center gap-1.5 uppercase">
-                        Drukuj
                     </button>
                     <button id="btnSaveToSummary" onclick="saveToSummary()" class="bg-black text-white border border-black hover:bg-gray-800 px-6 py-2 text-sm font-bold transition flex items-center gap-1.5 uppercase shadow-md">
                         Zapisz do Zestawienia
@@ -696,11 +753,10 @@
                     <div class="flex flex-wrap items-center gap-2">
                         <button onclick="printHistoryProtocol()" class="bg-green-600 border border-green-600 hover:bg-green-700 text-white px-3 py-1.5 text-xs font-bold transition uppercase shadow-md">Drukuj zestawienie</button>
                         <button onclick="exportHistoryToExcel()" class="bg-blue-600 border border-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 text-xs font-bold transition uppercase shadow-md">Eksport do Excela</button>
-                        <button id="btnDeleteSelectedHistory" onclick="deleteSelectedHistoryItemsWithPin()" class="bg-red-600 border border-red-600 hover:bg-red-700 text-white px-3 py-1.5 text-xs font-bold transition uppercase print-hide hidden">Usuń zaznaczone</button>
                     </div>
                 </div>
 
-                <div class="p-3 border-b border-black grid grid-cols-1 md:grid-cols-4 gap-3 bg-white">
+                <div class="p-3 border-b border-black grid grid-cols-1 md:grid-cols-5 gap-3 bg-white">
                     <div>
                         <label class="block text-xs font-bold text-black mb-1 uppercase">Data Od</label>
                         <input type="date" id="histFilterDateFrom" onchange="renderHistoryTable()" class="w-full border border-black p-1 text-sm outline-none bg-white">
@@ -717,10 +773,19 @@
                         <label class="block text-xs font-bold text-black mb-1 uppercase">Typ farby</label>
                         <select id="histFilterPaint" onchange="renderHistoryTable()" class="w-full border border-black p-1 text-sm outline-none bg-white"></select>
                     </div>
+                    <div>
+                        <label class="block text-xs font-bold text-black mb-1 uppercase">Status</label>
+                        <select id="historyFilterStatus" onchange="window.renderHistoryTable()" class="w-full border border-black p-1 text-sm outline-none bg-white cursor-pointer font-normal">
+                            <option value="ALL">WSZYSTKIE</option>
+                            <option value="OCZEKUJE">Oczekuje</option>
+                            <option value="ZAAKCEPTOWANO">Zaakceptowano</option>
+                            <option value="ODRZUCONO">Odrzucono</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
-            <div class="overflow-x-auto bg-white border-x border-b border-black">
+            <div class="overflow-x-auto overflow-y-hidden bg-white border-x border-b border-black">
                 <table class="w-full text-left text-xs whitespace-nowrap">
                     <thead class="bg-gray-100 text-black font-bold sticky top-0 border-b-2 border-black uppercase">
                         <tr>
@@ -740,18 +805,21 @@
 
         <!-- WIDOK: WYDANIE FARB (SHOPPRIMER) -->
         <div id="view-indusco" class="space-y-4 hidden mt-4">
-            <div class="bg-white p-4 border border-black print-hide">
-                <div class="flex justify-between border-b border-black pb-2 mb-3">
-                    <h2 class="text-sm font-bold text-black uppercase">Księgowanie Wydania / Utylizacji / Remanentu</h2>
+            <div class="bg-white border border-black print-hide">
+                <div class="flex justify-between items-center p-3 cursor-pointer bg-blue-600 hover:bg-blue-700 transition border-b border-black" onclick="document.getElementById('induscoFormWrapper').classList.toggle('hidden');">
+                    <h2 class="text-sm font-bold text-white uppercase">Wydanie / Utylizacja / Remanent</h2>
+                    <span class="text-[10px] font-bold text-blue-600 border border-transparent px-2 py-1 uppercase bg-white hover:bg-gray-100 transition shadow-sm">Rozwiń / Zwiń</span>
                 </div>
-                <div class="mb-3 w-full sm:w-48">
-                    <label class="block text-xs font-bold text-black mb-1 uppercase">Data zdarzenia</label>
-                    <input type="date" id="induscoDate" class="w-full border border-black p-1.5 text-sm outline-none">
-                </div>
-                <div id="induscoBulkRows" class="space-y-2 mb-4"></div>
-                <div class="flex flex-wrap gap-2">
-                    <button onclick="addInduscoBulkRow()" class="bg-gray-200 text-black border border-black hover:bg-gray-300 font-bold py-1.5 px-4 uppercase text-xs transition">+ Dodaj kolejną pozycję</button>
-                    <button onclick="saveBulkIndusco()" class="bg-black text-white border border-black hover:bg-gray-800 font-bold py-1.5 px-4 uppercase text-xs transition shadow-md">Zatwierdź Zdarzenie</button>
+                <div id="induscoFormWrapper" class="hidden p-4 border-t border-black bg-blue-50">
+                    <div class="mb-3 w-full sm:w-48">
+                        <label class="block text-xs font-bold text-black mb-1 uppercase">Data zdarzenia</label>
+                        <input type="date" id="induscoDate" class="w-full border border-black p-1.5 text-sm outline-none">
+                    </div>
+                    <div id="induscoBulkRows" class="space-y-2 mb-4"></div>
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="addInduscoBulkRow()" class="bg-gray-200 text-black border border-black hover:bg-gray-300 font-bold py-1.5 px-4 uppercase text-xs transition">+ Dodaj kolejną pozycję</button>
+                        <button onclick="saveBulkIndusco()" class="bg-black text-white border border-black hover:bg-gray-800 font-bold py-1.5 px-4 uppercase text-xs transition shadow-md">Zatwierdź Zdarzenie</button>
+                    </div>
                 </div>
             </div>
             
@@ -759,23 +827,32 @@
                 <div class="p-3 border-b border-black flex flex-col sm:flex-row justify-between items-center bg-white gap-3">
                     <h2 class="text-sm font-bold text-black uppercase">Historia magazynowa (wydania/utylizacje/remanenty)</h2>
                 </div>
-                <div class="p-3 grid grid-cols-1 md:grid-cols-3 gap-3 bg-white">
+                <div class="p-3 grid grid-cols-1 md:grid-cols-4 gap-3 bg-white">
                     <div>
                         <label class="block text-xs font-bold text-black mb-1 uppercase">Data Od</label>
-                        <input type="date" id="induscoFilterDateFrom" onchange="renderInduscoTable()" class="w-full border border-black p-1 text-sm outline-none bg-white">
+                        <input type="date" id="induscoFilterDateFrom" onchange="renderInduscoTable()" class="w-full border border-black p-1 text-sm outline-none bg-white cursor-pointer">
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-black mb-1 uppercase">Data Do</label>
-                        <input type="date" id="induscoFilterDateTo" onchange="renderInduscoTable()" class="w-full border border-black p-1 text-sm outline-none bg-white">
+                        <input type="date" id="induscoFilterDateTo" onchange="renderInduscoTable()" class="w-full border border-black p-1 text-sm outline-none bg-white cursor-pointer">
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-black mb-1 uppercase">Rodzaj towaru</label>
-                        <select id="induscoFilterPaint" onchange="renderInduscoTable()" class="w-full border border-black p-1 text-sm outline-none bg-white"></select>
+                        <select id="induscoFilterPaint" onchange="renderInduscoTable()" class="w-full border border-black p-1 text-sm outline-none bg-white cursor-pointer"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-black mb-1 uppercase">Status</label>
+                        <select id="induscoFilterStatus" onchange="renderInduscoTable()" class="w-full border border-black p-1 text-sm outline-none bg-gray-50 cursor-pointer font-normal">
+                            <option value="ALL">WSZYSTKIE</option>
+                            <option value="OCZEKUJE">Oczekuje</option>
+                            <option value="ZAAKCEPTOWANO">Zaakceptowano</option>
+                            <option value="ODRZUCONO">Odrzucono</option>
+                        </select>
                     </div>
                 </div>
             </div>
             
-            <div class="overflow-x-auto bg-white border-x border-b border-black">
+            <div class="overflow-x-auto overflow-y-hidden bg-white border-x border-b border-black">
                 <table class="w-full text-left text-xs whitespace-nowrap">
                     <thead class="bg-gray-100 text-black font-bold uppercase border-b-2 border-black">
                         <tr>
@@ -901,7 +978,7 @@
                         <span id="dbCountBadge" class="bg-white text-black border border-black px-2 py-0.5 text-xs font-bold">0</span>
                     </div>
                 </div>
-                <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
+                <div class="overflow-x-auto">
                     <table class="w-full text-left text-xs whitespace-nowrap table-auto">
                         <thead class="bg-white text-black font-bold sticky top-0 uppercase border-b-2 border-black z-10">
                             <tr>

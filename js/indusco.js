@@ -1,7 +1,8 @@
 // --- MODUŁ MAGAZYNU INDUSCO, ROZLICZEŃ DZIENNYCH I ALERTÓW (INDUSCO.JS) ---
 
 import { formatNumber, escapeHTML, parsePlDate, parsePlDateToISO, formatISOToPL, dateToISO } from './utils.js';
-import { shopPrimerRules } from './config.js';
+import { shopPrimerRules, ADMIN_PIN } from './config.js';
+import { firebaseDb, dbRef, dbSet, dbUpdate, dbRemove } from './auth.js';
 import { 
     paintTypes, induscoHistory, induscoDailyRecords, activeRemanentAlerts, activeInduscoRequests,
     projectsList, visibleDailyPaints, printHistory, autoSaveToDisk,
@@ -32,7 +33,7 @@ export function getAllPossibleDailyPaints() {
         if (!pt.fallbacks || !pt.fallbacks['Zielony']) paints.push(`${pt.name} - Zielony`); 
         paints.push(`${pt.name} - Rozcieńczalnik`); 
     }); 
-    return paints;
+    return [...new Set(paints)];
 }
 
 export function initDailyPaints() {
@@ -95,14 +96,23 @@ export function updateAllStocks() {
             let isKorekta = r.isRemanent || r.actionType === 'remanent';
             
             let btnAkcje = `<div class="flex flex-col gap-1 items-stretch w-16 mx-auto print-hide">`;
-            btnAkcje += `<button onclick="editInduscoRecord(${idx})" class="text-[10px] font-bold border border-black px-1 py-0.5 bg-white hover:bg-gray-200 uppercase leading-none">EDYTUJ</button>`;
+            const canEditBefore = currentUser && currentUser.indCanEditBefore !== false;
+            const canEditAfter = currentUser && currentUser.indCanEditAfter === true;
+            const canAccept = currentUser && currentUser.indCanAccept !== false;
+            const isAdmin = currentUser && currentUser.role === 'admin';
+
+            if (isAdmin || (!r.isAccepted && canEditBefore) || (r.isAccepted && canEditAfter)) {
+                btnAkcje += `<button onclick="editInduscoRecord(${idx})" class="text-white bg-blue-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-blue-800 leading-none">EDYTUJ</button>`;
+            }
             
-            if (!r.isAccepted) {
-                if (r.rejectionComment) {
-                    btnAkcje += `<button onclick="acceptInduscoRecord(${idx})" class="text-white bg-green-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-green-700 leading-none">Zatwierdź</button>`;
-                } else {
-                    btnAkcje += `<button onclick="acceptInduscoRecord(${idx})" class="text-white bg-green-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-green-700 leading-none">Akceptuj</button>`;
-                    btnAkcje += `<button onclick="rejectInduscoRecord(${idx})" class="text-white bg-red-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-red-700 leading-none">Odrzuć</button>`;
+            if (canAccept || isAdmin) {
+                if (!r.isAccepted) {
+                    if (r.rejectionComment) {
+                        btnAkcje += `<button onclick="acceptInduscoRecord(${idx})" class="text-white bg-green-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-green-700 leading-none">Zatwierdź</button>`;
+                    } else {
+                        btnAkcje += `<button onclick="acceptInduscoRecord(${idx})" class="text-white bg-green-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-green-700 leading-none">Zatwierdź</button>
+                                     <button onclick="rejectInduscoRecord(${idx})" class="text-white bg-red-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-red-700 mt-1 leading-none">Odrzuć</button>`;
+                    }
                 }
             }
             btnAkcje += `</div>`;
@@ -133,23 +143,61 @@ export function updateAllStocks() {
         Object.entries(p.brandStats).forEach(([brand, stat]) => {
             if (stat.thinner > 0) {
                 const pName = `${brand} - Rozcieńczalnik`;
-                if (calcEvents[pName]) calcEvents[pName].push({ 
-                    dateObj, wydanie: 0, utylizacja: 0, zuzycie: stat.thinner, rodzaj: rodzajDisplay, 
-                    jednostka: p.projectName || p.unit || '-', kalkulacja: p.protocolNumber || '-', 
-                    m2: p.area || 0, isAccepted: p.isAccepted, acceptedBy: p.acceptedBy, rejectionComment: p.rejectionComment, rejectedBy: p.rejectedBy,
-                    akcje: `<button onclick="loadHistoryItem('${p.id}', 'daily')" class="text-[10px] font-bold bg-[#6466f1] text-white border border-black px-2 py-1 uppercase hover:bg-blue-800 print-hide">PODGLĄD</button>` 
-                });
+                if (calcEvents[pName]) {
+                    let actionsHtml = `<div class="flex flex-col gap-1 items-stretch w-16 mx-auto"><button onclick="loadHistoryItem('${p.id}', 'daily', 'view')" class="text-black font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-black hover:text-white bg-white leading-none print-hide">PODGLĄD</button>`;
+                    
+                    const canEditBefore = currentUser && currentUser.calcCanEditBefore !== false;
+                    const canEditAfter = currentUser && currentUser.calcCanEditAfter === true;
+                    const canEdit = currentUser && (currentUser.role === 'admin' || (!p.isAccepted ? canEditBefore : canEditAfter));
+
+                    if (canEdit) {
+                        actionsHtml += `<button onclick="editHistoryItem('${p.id}', 'daily')" class="text-white bg-blue-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-blue-800 leading-none">EDYTUJ</button>`;
+                    }
+                    if (currentUser && (currentUser.role === 'admin' || currentUser.calcCanAccept)) {
+                        if (!p.isAccepted && !p.rejectionComment) {
+                            actionsHtml += `<button onclick="loadHistoryItem('${p.id}', 'daily', 'accept')" class="text-white bg-green-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-green-700 leading-none">POTWIERDŹ</button>`;
+                            actionsHtml += `<button onclick="loadHistoryItem('${p.id}', 'daily', 'reject')" class="text-white bg-red-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-red-700 leading-none">ODRZUĆ</button>`;
+                        }
+                    }
+                    actionsHtml += `</div>`;
+
+                    calcEvents[pName].push({ 
+                        dateObj, wydanie: 0, utylizacja: 0, zuzycie: stat.thinner, rodzaj: rodzajDisplay, 
+                        jednostka: p.projectName || p.unit || '-', kalkulacja: p.protocolNumber || '-', 
+                        m2: p.area || 0, isAccepted: p.isAccepted, acceptedBy: p.acceptedBy, rejectionComment: p.rejectionComment, rejectedBy: p.rejectedBy,
+                        akcje: actionsHtml 
+                    });
+                }
             }
             if (stat.colors) {
                 Object.entries(stat.colors).forEach(([color, vol]) => {
                     if (vol > 0) {
                         const pName = `${brand} - ${color}`;
-                        if (calcEvents[pName]) calcEvents[pName].push({ 
-                            dateObj, wydanie: 0, utylizacja: 0, zuzycie: vol, rodzaj: rodzajDisplay, 
-                            jednostka: p.projectName || p.unit || '-', kalkulacja: p.protocolNumber || '-', 
-                            m2: p.area || 0, isAccepted: p.isAccepted, acceptedBy: p.acceptedBy, rejectionComment: p.rejectionComment, rejectedBy: p.rejectedBy,
-                            akcje: `<button onclick="loadHistoryItem('${p.id}', 'daily')" class="text-[10px] font-bold bg-[#6466f1] text-white border border-black px-2 py-1 uppercase hover:bg-blue-800 print-hide">PODGLĄD</button>` 
-                        });
+                        if (calcEvents[pName]) {
+                            let actionsHtml = `<div class="flex flex-col gap-1 items-stretch w-16 mx-auto"><button onclick="loadHistoryItem('${p.id}', 'daily', 'view')" class="text-black font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-black hover:text-white bg-white leading-none print-hide">PODGLĄD</button>`;
+                            
+                            const canEditBefore = currentUser && currentUser.calcCanEditBefore !== false;
+                            const canEditAfter = currentUser && currentUser.calcCanEditAfter === true;
+                            const canEdit = currentUser && (currentUser.role === 'admin' || (!p.isAccepted ? canEditBefore : canEditAfter));
+
+                            if (canEdit) {
+                                actionsHtml += `<button onclick="editHistoryItem('${p.id}', 'daily')" class="text-white bg-blue-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-blue-800 leading-none">EDYTUJ</button>`;
+                            }
+                            if (currentUser && (currentUser.role === 'admin' || currentUser.calcCanAccept)) {
+                                if (!p.isAccepted && !p.rejectionComment) {
+                                    actionsHtml += `<button onclick="loadHistoryItem('${p.id}', 'daily', 'accept')" class="text-white bg-green-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-green-700 leading-none">POTWIERDŹ</button>`;
+                                    actionsHtml += `<button onclick="loadHistoryItem('${p.id}', 'daily', 'reject')" class="text-white bg-red-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-red-700 leading-none">ODRZUĆ</button>`;
+                                }
+                            }
+                            actionsHtml += `</div>`;
+
+                            calcEvents[pName].push({ 
+                                dateObj, wydanie: 0, utylizacja: 0, zuzycie: vol, rodzaj: rodzajDisplay, 
+                                jednostka: p.projectName || p.unit || '-', kalkulacja: p.protocolNumber || '-', 
+                                m2: p.area || 0, isAccepted: p.isAccepted, acceptedBy: p.acceptedBy, rejectionComment: p.rejectionComment, rejectedBy: p.rejectedBy,
+                                akcje: actionsHtml 
+                            });
+                        }
                     }
                 });
             }
@@ -278,19 +326,27 @@ export function renderInduscoTable() {
         `;
     }
 
-    if (!tbody) return; tbody.innerHTML = '';
-    const isAdmin = currentUser && currentUser.role === 'admin';
-
-    const fDateFromStr = document.getElementById('induscoFilterDateFrom') ? document.getElementById('induscoFilterDateFrom').value : '';
-    const fDateToStr = document.getElementById('induscoFilterDateTo') ? document.getElementById('induscoFilterDateTo').value : '';
-    const fPaint = document.getElementById('induscoFilterPaint') ? document.getElementById('induscoFilterPaint').value : '';
+    if (!tbody) return;
+    const fDateFromStr = document.getElementById('induscoFilterDateFrom').value;
+    const fDateToStr = document.getElementById('induscoFilterDateTo').value;
+    const fPaint = document.getElementById('induscoFilterPaint').value;
+    const fStatusEl = document.getElementById('induscoFilterStatus');
+    const fStatus = fStatusEl ? fStatusEl.value : 'ALL';
+    
     const dFrom = fDateFromStr ? new Date(fDateFromStr) : new Date('1970-01-01'); dFrom.setHours(0,0,0,0);
     const dTo = fDateToStr ? new Date(fDateToStr) : new Date('2099-12-31'); dTo.setHours(23,59,59,999);
 
-    const filteredData = induscoHistory.map((row, idx) => ({...row, originalIndex: idx})).filter(row => {
-        const rowDate = parsePlDate(row.date);
+    let dataWithIndex = induscoHistory.map((r, index) => ({ ...r, originalIndex: index }));
+    const filteredData = dataWithIndex.filter(row => {
+        const rowDateParts = row.date.split('.');
+        const rowDate = new Date(rowDateParts[2], rowDateParts[1] - 1, rowDateParts[0]);
         if (rowDate < dFrom || rowDate > dTo) return false;
         if (fPaint && !row.paintType.toUpperCase().includes(fPaint.toUpperCase())) return false;
+        if (fStatus !== 'ALL') {
+            if (fStatus === 'ZAAKCEPTOWANO' && !row.isAccepted) return false;
+            if (fStatus === 'ODRZUCONO' && (!row.rejectionComment || row.isAccepted)) return false;
+            if (fStatus === 'OCZEKUJE' && (row.isAccepted || row.rejectionComment)) return false;
+        }
         return true;
     });
 
@@ -304,6 +360,9 @@ export function renderInduscoTable() {
             let amountDisplay = formatNumber(row.amount, 2); 
             let trClass = "hover:bg-gray-100 transition-colors";
             
+            if (row.isAccepted) trClass = "bg-green-50 hover:bg-green-100 transition-colors";
+            else if (row.rejectionComment) trClass = "bg-red-200 hover:bg-red-300 transition-colors";
+
             let akcjaDisplay = "WYDANIE"; let akcjaColor = "text-green-700";
             
             if (row.actionType === 'utylizacja' || (row.amount < 0 && !row.isRemanent && row.actionType !== 'remanent')) {
@@ -316,7 +375,7 @@ export function renderInduscoTable() {
                 if (korekta !== undefined) amountDisplay = (korekta > 0 ? "+" : "") + formatNumber(korekta, 2);
                 else amountDisplay = formatNumber(row.amount, 2);
                 
-                akcjaDisplay = "REMANENT"; akcjaColor = "text-yellow-700"; trClass = "bg-yellow-50 hover:bg-yellow-100 transition-colors";
+                akcjaDisplay = "REMANENT"; akcjaColor = "text-yellow-700";
             } else if (row.amount < 0) {
                 amountDisplay = formatNumber(Math.abs(row.amount), 2);
             }
@@ -331,29 +390,40 @@ export function renderInduscoTable() {
             }
 
             let akcjeHtml = `<div class="flex flex-col gap-1 items-center w-16 mx-auto">`;
-            akcjeHtml += `<button onclick="editInduscoRecord(${i})" class="w-full text-white bg-blue-600 font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-blue-800 leading-none">Edytuj</button>`;
+            const canEditBefore = currentUser && currentUser.indCanEditBefore !== false;
+            const canEditAfter = currentUser && currentUser.indCanEditAfter === true;
+            const canAccept = currentUser && currentUser.indCanAccept !== false;
+            const canDelete = currentUser && currentUser.indCanDelete !== false;
+            const isAdmin = currentUser && currentUser.role === 'admin';
+
+            if (isAdmin || (!row.isAccepted && canEditBefore) || (row.isAccepted && canEditAfter)) {
+                akcjeHtml += `<button onclick="editInduscoRecord(${i})" class="w-full text-white bg-blue-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-blue-800 leading-none">EDYTUJ</button>`;
+            }
             
-            if (!row.isAccepted) {
-                if (row.rejectionComment) {
-                     akcjeHtml += `<button onclick="acceptInduscoRecord(${i})" class="w-full text-white bg-green-600 font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-green-700 leading-none">Zatwierdź</button>`;
-                } else {
-                     akcjeHtml += `<button onclick="acceptInduscoRecord(${i})" class="w-full text-white bg-green-600 font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-green-700 leading-none">Akceptuj</button>`;
-                     akcjeHtml += `<button onclick="rejectInduscoRecord(${i})" class="w-full text-white bg-red-600 font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-red-700 leading-none">Odrzuć</button>`;
+            if (canAccept || isAdmin) {
+                if (!row.isAccepted) {
+                    if (row.rejectionComment) {
+                         akcjeHtml += `<button onclick="acceptInduscoRecord(${i})" class="w-full text-white bg-green-600 font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-green-700 leading-none">Zatwierdź</button>`;
+                    } else {
+                         akcjeHtml += `<button onclick="acceptInduscoRecord(${i})" class="w-full text-white bg-green-600 font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-green-700 leading-none">Zatwierdź</button>
+                                       <button onclick="rejectInduscoRecord(${i})" class="w-full text-white bg-red-600 font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-red-700 mt-1 leading-none">Odrzuć</button>`;
+                    }
                 }
             }
-            if (isAdmin) {
+            
+            if (isAdmin || canDelete) {
                 akcjeHtml += `<button onclick="removeInduscoRecord(${i})" class="w-full text-black font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-black hover:text-white bg-white leading-none">Usuń</button>`;
             }
             akcjeHtml += `</div>`;
 
             html += `
                 <tr class="${trClass}">
-                    <td class="px-3 py-2 border-r border-black font-bold text-black align-middle">${row.date}</td>
-                    <td class="px-3 py-2 border-r border-black text-black uppercase flex items-center align-middle">${typeDisplay}</td>
-                    <td class="px-3 py-2 border-r border-black text-right font-bold text-black align-middle">${amountDisplay}</td>
-                    <td class="px-3 py-2 border-r border-black font-bold ${akcjaColor} uppercase text-[10px] align-middle">${akcjaDisplay}</td>
-                    <td class="px-3 py-2 border-r border-black text-black text-xs whitespace-normal align-middle">${authorHtml}</td>
-                    <td class="px-3 py-2 text-center print-hide border-black align-middle">
+                    <td class="px-3 py-2 border-r border-b border-black font-bold text-black align-middle">${row.date}</td>
+                    <td class="px-3 py-2 border-r border-b border-black text-black uppercase align-middle"><div class="flex items-center">${typeDisplay}</div></td>
+                    <td class="px-3 py-2 border-r border-b border-black text-right font-bold text-black align-middle">${amountDisplay}</td>
+                    <td class="px-3 py-2 border-r border-b border-black font-bold ${akcjaColor} uppercase text-[10px] align-middle">${akcjaDisplay}</td>
+                    <td class="px-3 py-2 border-r border-b border-black text-black text-xs whitespace-normal align-middle">${authorHtml}</td>
+                    <td class="px-3 py-2 text-center print-hide border-b border-black align-middle">
                         ${akcjeHtml}
                     </td>
                 </tr>
@@ -380,7 +450,7 @@ export async function saveBulkIndusco() {
     let localAlerts = [...activeRemanentAlerts];
     let localRequests = [...activeInduscoRequests];
 
-    rows.forEach(row => {
+    for (const row of Array.from(rows)) {
         const paintSelect = row.querySelector('.indusco-paint-select'), actionSelect = row.querySelector('.indusco-action-type'), amountInput = row.querySelector('.indusco-amount-input');
         if (paintSelect && amountInput && actionSelect) {
             const paintType = paintSelect.value, actionType = actionSelect.value, amount = parseFloat(amountInput.value);
@@ -390,7 +460,7 @@ export async function saveBulkIndusco() {
                 if (actionType === 'utylizacja') finalAmount = -Math.abs(amount);
                 else if (actionType === 'wydanie') finalAmount = Math.abs(amount);
                 
-                induscoHistory.push({ 
+                const newItem = { 
                     id: 'ind_' + Date.now() + Math.random().toString(36).substr(2, 5), 
                     paintType, 
                     amount: finalAmount, 
@@ -403,25 +473,34 @@ export async function saveBulkIndusco() {
                     acceptedBy: null,
                     rejectionComment: null,
                     rejectedBy: null
-                });
+                };
+                induscoHistory.push(newItem);
+                await dbSet(dbRef(firebaseDb, 'appState/induscoHistory/' + newItem.id), newItem);
                 
                 if (isRem) {
-                    localAlerts.push({ id: Date.now().toString() + Math.random().toString(36).substr(2, 5), date: dateStr, paintType: paintType, author: currentUser ? (currentUser.name || currentUser.login) : "Nieznany" });
+                    const newAlert = { id: Date.now().toString() + Math.random().toString(36).substr(2, 5), date: dateStr, paintType: paintType, author: currentUser ? (currentUser.name || currentUser.login) : "Nieznany" };
+                    localAlerts.push(newAlert);
+                    await dbSet(dbRef(firebaseDb, 'appState/activeRemanentAlerts/' + newAlert.id), newAlert);
                 }
                 if (actionType === 'wydanie') {
+                    const toRemove = localRequests.filter(req => req.paintType === paintType);
+                    for (const req of toRemove) {
+                        const fbKey = req.firebaseKey || req.id;
+                        await dbRemove(dbRef(firebaseDb, 'appState/activeInduscoRequests/' + fbKey));
+                    }
                     localRequests = localRequests.filter(req => req.paintType !== paintType);
                 }
                 addedCount++;
             }
         }
-    });
+    }
 
     setActiveRemanentAlerts(localAlerts);
     setActiveInduscoRequests(localRequests);
 
     if (addedCount > 0) {
         renderInduscoTable(); if (document.getElementById('view-daily') && document.getElementById('view-daily').classList.contains('block')) { renderDailySidebar(); renderDailyLedger(); }
-        autoSaveToDisk(); await window.customAlert(`Pomyślnie zapisano ${addedCount} pozycji.`);
+        await window.customAlert(`Pomyślnie zapisano ${addedCount} pozycji.`);
         document.getElementById('induscoBulkRows').innerHTML = ''; addInduscoBulkRow(); 
     } else await window.customAlert("Nie dodano żadnych wpisów. Upewnij się, że wpisane ilości są prawidłowe.");
 }
@@ -439,7 +518,8 @@ export async function acceptInduscoRecord(index) {
         induscoHistory[index].lastModified = Date.now();
         
         if (window.setInduscoHistory) window.setInduscoHistory(induscoHistory);
-        autoSaveToDisk(true);
+        const fbKey = induscoHistory[index].firebaseKey || induscoHistory[index].id;
+        await dbUpdate(dbRef(firebaseDb, 'appState/induscoHistory/' + fbKey), induscoHistory[index]);
         
         renderInduscoTable();
         if (document.getElementById('view-daily') && document.getElementById('view-daily').classList.contains('block')) { 
@@ -463,7 +543,8 @@ export async function rejectInduscoRecord(index) {
         induscoHistory[index].lastModified = Date.now();
         
         if (window.setInduscoHistory) window.setInduscoHistory(induscoHistory);
-        autoSaveToDisk(true);
+        const fbKey = induscoHistory[index].firebaseKey || induscoHistory[index].id;
+        await dbUpdate(dbRef(firebaseDb, 'appState/induscoHistory/' + fbKey), induscoHistory[index]);
         
         renderInduscoTable();
         if (document.getElementById('view-daily') && document.getElementById('view-daily').classList.contains('block')) { 
@@ -476,19 +557,45 @@ export async function rejectInduscoRecord(index) {
 }
 
 export async function removeInduscoRecord(index) {
-    if (!currentUser || currentUser.role !== 'admin') { await window.customAlert("Usuwanie jest dozwolone tylko dla administratora."); return; }
+    if (!currentUser || (currentUser.role !== 'admin' && currentUser.indCanDelete === false)) { await window.customAlert("Brak uprawnień do usuwania!"); return; }
     const pin = await window.customPrompt("Podaj kod autoryzacji (PIN), aby usunąć wpis z historii:", 'password');
-    if (pin === "4321") { 
+    if (pin === ADMIN_PIN) { 
+        const idToRemove = induscoHistory[index].id;
         window.forceNextCloudOverwrite = true;
+        const itemToDelete = induscoHistory[index];
+        const fbKey = itemToDelete.firebaseKey || idToRemove;
         induscoHistory.splice(index, 1); 
+        await dbRemove(dbRef(firebaseDb, 'appState/induscoHistory/' + fbKey));
         renderInduscoTable(); 
         if (document.getElementById('view-daily') && document.getElementById('view-daily').classList.contains('block')) { renderDailySidebar(); renderDailyLedger(); } 
-        autoSaveToDisk(); 
     } else if (pin !== null) await window.customAlert("Nieprawidłowy kod PIN.");
 }
 
-export function editInduscoRecord(index) {
-    window.currentEditInduscoIndex = index; const record = induscoHistory[index];
+export async function editInduscoRecord(index) {
+    const record = induscoHistory[index];
+    const canEditAfter = currentUser && currentUser.indCanEditAfter === true;
+    const isAdmin = currentUser && currentUser.role === 'admin';
+
+    if (record.isAccepted) {
+        if (!isAdmin && !canEditAfter) {
+            await window.customAlert("Ten wpis został zaakceptowany i jest zablokowany do edycji.");
+            return;
+        }
+        if (isAdmin) {
+            const pin = await window.customPrompt("Ten wpis jest zaakceptowany. Podaj PIN aby edytować:", "password");
+            if (pin !== ADMIN_PIN) {
+                if (pin !== null) await window.customAlert("Nieprawidłowy PIN.");
+                return;
+            }
+        }
+    } else {
+        const canEditBefore = currentUser && currentUser.indCanEditBefore !== false;
+        if (!isAdmin && !canEditBefore) {
+            await window.customAlert("Brak uprawnień do edycji tego wpisu.");
+            return;
+        }
+    }
+    window.currentEditInduscoIndex = index;
     document.getElementById('editInduscoDate').value = parsePlDateToISO(record.date);
     let baseType = record.paintType.replace(/<[^>]*>?/gm, '').trim().replace("REMANENT", "").trim();
     document.getElementById('editInduscoPaint').value = baseType;
@@ -544,18 +651,26 @@ export async function saveEditIndusco() {
     let localRequests = [...activeInduscoRequests];
 
     if (!wasRem && isRem) {
-        localAlerts.push({ id: Date.now().toString() + Math.random().toString(36).substr(2, 5), date: formatISOToPL(dIso), paintType: type, author: currentUser ? (currentUser.name || currentUser.login) : "System" });
+        const newAlert = { id: Date.now().toString() + Math.random().toString(36).substr(2, 5), date: formatISOToPL(dIso), paintType: type, author: currentUser ? (currentUser.name || currentUser.login) : "System" };
+        localAlerts.push(newAlert);
+        dbSet(dbRef(firebaseDb, 'appState/activeRemanentAlerts/' + newAlert.id), newAlert);
     }
     if (actionType === 'wydanie') {
+        const toRemove = localRequests.filter(req => req.paintType === type);
+        for (const req of toRemove) {
+            const fbKey = req.firebaseKey || req.id;
+            dbRemove(dbRef(firebaseDb, 'appState/activeInduscoRequests/' + fbKey));
+        }
         localRequests = localRequests.filter(req => req.paintType !== type);
     }
     
     setActiveRemanentAlerts(localAlerts);
     setActiveInduscoRequests(localRequests);
+    const fbKey = induscoHistory[index].firebaseKey || induscoHistory[index].id;
+    dbUpdate(dbRef(firebaseDb, 'appState/induscoHistory/' + fbKey), induscoHistory[index]);
 
     renderInduscoTable(); 
     if (document.getElementById('view-daily') && document.getElementById('view-daily').classList.contains('block')) { renderDailySidebar(); renderDailyLedger(); }
-    autoSaveToDisk(); 
     if (window.closeEditInduscoModal) window.closeEditInduscoModal();
 }
 
@@ -590,10 +705,12 @@ export function updateAlertsUI() {
 
 export function acknowledgeRemanent(id) {
     const newAlerts = activeRemanentAlerts.filter(a => a.id !== id);
+    const itemToRemove = activeRemanentAlerts.find(a => a.id.toString() === id.toString());
+    const fbKey = itemToRemove ? (itemToRemove.firebaseKey || id) : id;
     setActiveRemanentAlerts(newAlerts);
+    dbRemove(dbRef(firebaseDb, 'appState/activeRemanentAlerts/' + fbKey));
     updateAlertsUI();
     if(window.openNotificationsModal) window.openNotificationsModal();
-    autoSaveToDisk();
 }
 
 export async function submitInduscoRequest() {
@@ -607,16 +724,17 @@ export async function submitInduscoRequest() {
 
     const dateStr = new Date().toLocaleString('pl-PL', {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute:'2-digit'});
     let localReqs = [...activeInduscoRequests];
-    localReqs.push({
+    const newReq = {
         id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
         date: dateStr,
         paintType: paint,
         author: currentUser ? (currentUser.name || currentUser.login) : "System"
-    });
+    };
+    localReqs.push(newReq);
+    dbSet(dbRef(firebaseDb, 'appState/activeInduscoRequests/' + newReq.id), newReq);
     
     setActiveInduscoRequests(localReqs);
     updateAlertsUI();
-    autoSaveToDisk();
     if(window.closeInduscoRequestModal) window.closeInduscoRequestModal();
     await window.customAlert('Zapotrzebowanie zostało wysłane i dodane do alertów. Zniknie automatycznie po dodaniu dostawy ("Wydanie").');
 }
@@ -762,6 +880,9 @@ export function renderDailyLedger() {
     let [year, month] = monthVal.split('-');
     year = parseInt(year); month = parseInt(month) - 1;
 
+    const fStatusEl = document.getElementById('dailyFilterStatus');
+    const fStatus = fStatusEl ? fStatusEl.value : 'ALL';
+
     const events = window.calcEvents ? (window.calcEvents[currentDailyPaint] || []) : [];
     const todayIso = dateToISO(new Date());
 
@@ -790,6 +911,14 @@ export function renderDailyLedger() {
         const isCurrentMonth = ev.dateObj.getFullYear() === year && ev.dateObj.getMonth() === month;
 
         if (isCurrentMonth) {
+            if (fStatus !== 'ALL') {
+                let sMatch = true;
+                if (fStatus === 'ZAAKCEPTOWANO' && !ev.isAccepted) sMatch = false;
+                if (fStatus === 'ODRZUCONO' && (!ev.rejectionComment || ev.isAccepted)) sMatch = false;
+                if (fStatus === 'OCZEKUJE' && (ev.isAccepted || ev.rejectionComment)) sMatch = false;
+                if (!sMatch) return;
+            }
+
             eventsInMonth++;
             if (ev.rodzaj === 'REMANENT') {
                 sumZuzycie += valZuzycie; 
@@ -809,22 +938,22 @@ export function renderDailyLedger() {
             let calcDisplay = ev.kalkulacja || '-';
             if (ev.kalkulacja && ev.kalkulacja !== '-') {
                 if (ev.isAccepted) {
-                    calcDisplay += `<div class="mt-0.5 text-[9px] text-green-800 font-bold bg-green-100 border border-green-800 px-1 py-0.5 whitespace-nowrap">ZAAKCEPTOWANO</div>`;
+                    calcDisplay += `<div class="mt-0.5 text-[9px] text-green-800 font-bold bg-green-100 border border-green-800 px-1 py-0.5 text-center truncate w-full max-w-[110px] mx-auto">ZAAKCEPTOWANO</div>`;
                 } else if (ev.rejectionComment) {
-                    calcDisplay += `<div class="mt-0.5 text-[9px] text-red-800 font-bold bg-red-100 border border-red-800 px-1 py-0.5 whitespace-nowrap truncate max-w-[150px]" title="${escapeHTML(ev.rejectionComment)}">ODRZUCONO: ${escapeHTML(ev.rejectionComment)}</div>`;
+                    calcDisplay += `<div class="mt-0.5 text-[9px] text-red-800 font-bold bg-red-100 border border-red-800 px-1 py-0.5 text-center truncate w-full max-w-[110px] mx-auto" title="${escapeHTML(ev.rejectionComment)}">ODRZUCONO: ${escapeHTML(ev.rejectionComment)}</div>`;
                 } else {
-                    calcDisplay += `<div class="mt-0.5 text-[9px] text-orange-700 font-bold bg-orange-100 border border-orange-700 px-1 py-0.5 whitespace-nowrap">OCZEKUJE</div>`;
+                    calcDisplay += `<div class="mt-0.5 text-[9px] text-orange-700 font-bold bg-orange-100 border border-orange-700 px-1 py-0.5 text-center truncate w-full max-w-[110px] mx-auto">OCZEKUJE</div>`;
                 }
             } else if (ev.author) {
                 let cleanAuthor = ev.author.replace(/<[^>]*>?/gm, '');
                 calcDisplay = `<div class="text-[9px] text-gray-500 font-normal truncate max-w-[150px] uppercase" title="Wprowadził(a): ${escapeHTML(cleanAuthor)}">${escapeHTML(cleanAuthor)}</div>`;
                 
                 if (ev.isAccepted) {
-                    calcDisplay += `<div class="mt-0.5 text-[9px] text-green-800 font-bold bg-green-100 border border-green-800 px-1 py-0.5 whitespace-nowrap">ZAAKCEPTOWANO</div>`;
+                    calcDisplay += `<div class="mt-0.5 text-[9px] text-green-800 font-bold bg-green-100 border border-green-800 px-1 py-0.5 text-center truncate w-full max-w-[110px] mx-auto">ZAAKCEPTOWANO</div>`;
                 } else if (ev.rejectionComment) {
-                    calcDisplay += `<div class="mt-0.5 text-[9px] text-red-800 font-bold bg-red-100 border border-red-800 px-1 py-0.5 whitespace-nowrap truncate max-w-[150px]" title="${escapeHTML(ev.rejectionComment)}">ODRZUCONO: ${escapeHTML(ev.rejectionComment)}</div>`;
+                    calcDisplay += `<div class="mt-0.5 text-[9px] text-red-800 font-bold bg-red-100 border border-red-800 px-1 py-0.5 text-center truncate w-full max-w-[110px] mx-auto" title="${escapeHTML(ev.rejectionComment)}">ODRZUCONO: ${escapeHTML(ev.rejectionComment)}</div>`;
                 } else {
-                    calcDisplay += `<div class="mt-0.5 text-[9px] text-orange-700 font-bold bg-orange-100 border border-orange-700 px-1 py-0.5 whitespace-nowrap">OCZEKUJE</div>`;
+                    calcDisplay += `<div class="mt-0.5 text-[9px] text-orange-700 font-bold bg-orange-100 border border-orange-700 px-1 py-0.5 text-center truncate w-full max-w-[110px] mx-auto">OCZEKUJE</div>`;
                 }
             }
 
@@ -833,15 +962,15 @@ export function renderDailyLedger() {
             let rowClass = (evDateIso === todayIso) ? "bg-yellow-100 hover:bg-yellow-200 border-b border-yellow-300" : "hover:bg-gray-50 border-b border-gray-200 bg-white";
 
             html += `<tr class="${rowClass}">
-                <td class="px-2 py-1 border-r border-black font-bold align-middle text-black">${displayDate}</td>
-                <td class="px-2 py-1 border-r border-black font-bold uppercase align-middle">${ev.jednostka || '-'}</td>
-                <td class="px-2 py-1 border-r border-black text-green-700 font-bold text-center align-middle">${ev.wydanie > 0 ? formatNumber(ev.wydanie) : ''}</td>
-                <td class="px-2 py-1 border-r border-black text-red-600 font-bold text-center align-middle">${ev.utylizacja > 0 ? formatNumber(ev.utylizacja) : ''}</td>
-                <td class="px-2 py-1 border-r border-black font-bold text-right px-2 ${zuzycieClass} align-middle">${zuzycieText}</td>
-                <td class="px-2 py-1 border-r border-black font-bold bg-yellow-50 text-black text-sm text-right px-2 align-middle">${formatNumber(ev.pozostalo)}</td>
-                <td class="px-2 py-1 border-r border-black text-blue-700 font-bold text-center align-middle">${ev.m2 > 0 ? formatNumber(ev.m2) : ''}</td>
-                <td class="px-2 py-1 border-r border-black text-gray-700 font-bold uppercase text-[10px] align-middle">${ev.rodzaj}</td>
-                <td class="px-2 py-1 border-r border-black text-gray-700 font-bold text-[10px] uppercase align-middle">${calcDisplay}</td>
+                <td class="px-2 py-1 border-r border-b border-black font-bold align-middle text-black">${displayDate}</td>
+                <td class="px-2 py-1 border-r border-b border-black font-bold uppercase align-middle">${ev.jednostka || '-'}</td>
+                <td class="px-2 py-1 border-r border-b border-black text-green-700 font-bold text-center align-middle">${ev.wydanie > 0 ? formatNumber(ev.wydanie) : ''}</td>
+                <td class="px-2 py-1 border-r border-b border-black text-red-600 font-bold text-center align-middle">${ev.utylizacja > 0 ? formatNumber(ev.utylizacja) : ''}</td>
+                <td class="px-2 py-1 border-r border-b border-black font-bold text-right px-2 ${zuzycieClass} align-middle">${zuzycieText}</td>
+                <td class="px-2 py-1 border-r border-b border-black font-bold bg-yellow-50 text-black text-sm text-right px-2 align-middle">${formatNumber(ev.pozostalo)}</td>
+                <td class="px-2 py-1 border-r border-b border-black text-blue-700 font-bold text-center align-middle">${ev.m2 > 0 ? formatNumber(ev.m2) : ''}</td>
+                <td class="px-2 py-1 border-r border-b border-black text-gray-700 font-bold uppercase text-[10px] align-middle">${ev.rodzaj}</td>
+                <td class="px-2 py-1 border-r border-b border-black text-gray-700 font-bold text-[10px] uppercase align-middle">${calcDisplay}</td>
                 <td class="px-2 py-1 border-b border-black text-center print-hide align-middle">${ev.akcje || '-'}</td>
             </tr>`;
         }
@@ -883,12 +1012,14 @@ export function renderDailyInduscoSidebar() {
 export function addInduscoDailyRow(dateIso) {
     if (!currentDailyInduscoPaint) return;
     const newRecords = [...induscoDailyRecords];
-    newRecords.push({
+    const newRecord = {
         id: 'id_' + Date.now() + Math.random().toString(36).substr(2, 5),
         date: dateIso, paint: currentDailyInduscoPaint, unit: '', m2: '', matType: 'Blachy', lastModified: Date.now()
-    });
+    };
+    newRecords.push(newRecord);
     setInduscoDailyRecords(newRecords);
-    autoSaveToDisk(); renderDailyInduscoLedger();
+    dbSet(dbRef(firebaseDb, 'appState/induscoDailyRecords/' + newRecord.id), newRecord);
+    renderDailyInduscoLedger();
     setTimeout(() => {
         const tableContainer = document.querySelector('#view-daily-indusco .overflow-auto');
         const addedInput = document.querySelector(`input[onchange*="'${newRecords[newRecords.length-1].id}'"]`);
@@ -902,10 +1033,13 @@ export function addInduscoDailyRow(dateIso) {
 export function removeInduscoDailyRow(id) {
     window.forceNextCloudOverwrite = true;
     const newRecords = induscoDailyRecords.filter(r => r.id !== id);
+    const itemToRemove = induscoDailyRecords.find(r => r.id.toString() === id.toString());
+    const fbKey = itemToRemove ? (itemToRemove.firebaseKey || id) : id;
     setInduscoDailyRecords(newRecords);
+    dbRemove(dbRef(firebaseDb, 'appState/induscoDailyRecords/' + fbKey));
     updateAllStocks();
     renderDailyInduscoSidebar();
-    autoSaveToDisk(); renderDailyInduscoLedger();
+    renderDailyInduscoLedger();
 }
 
 export function updateInduscoDailyRecord(id, dateIso, field, value) {
@@ -938,9 +1072,10 @@ export function updateInduscoDailyRecord(id, dateIso, field, value) {
         }
 
         setInduscoDailyRecords(newRecords);
+        dbSet(dbRef(firebaseDb, 'appState/induscoDailyRecords/' + record.id), record);
         updateAllStocks();
         renderDailyInduscoSidebar();
-        autoSaveToDisk(); renderDailyInduscoLedger();
+        renderDailyInduscoLedger();
     }
 }
 
@@ -1066,7 +1201,7 @@ export function renderDailyInduscoLedger() {
                 ? `<select class="${selectClass} uppercase text-center text-gray-400" disabled><option>-</option></select>` 
                 : `<select class="${selectClass} uppercase text-center" onchange="updateInduscoDailyRecord('${r.id}', '${dateIso}', 'matType', this.value)"><option value="Blachy" ${!isProfile?'selected':''}>BLACHY</option><option value="Profile" ${isProfile?'selected':''}>PROFILE/RURY</option></select>`;
 
-            html += `<tr class="${rowClass}"><td class="border-r border-black font-bold align-middle ${isCurrentMonth ? 'text-black' : ''}">${dateCellContent}</td><td class="border-r border-black">${unitSelectHTML}</td><td class="border-r border-black">${wydInput}</td><td class="border-r border-black">${utyInput}</td><td class="border-r border-black font-bold text-blue-700 text-right px-2 align-middle bg-gray-50 text-xs">${displayZuz}</td><td class="border-r border-black font-bold text-black text-right px-2 align-middle bg-yellow-50 text-xs">${displayBal}</td><td class="border-r border-black">${m2Input}</td><td class="border-black">${matSelect}</td></tr>`;
+            html += `<tr class="${rowClass}"><td class="border-r border-b border-black font-bold align-middle ${isCurrentMonth ? 'text-black' : ''}">${dateCellContent}</td><td class="border-r border-b border-black">${unitSelectHTML}</td><td class="border-r border-b border-black">${wydInput}</td><td class="border-r border-b border-black">${utyInput}</td><td class="border-r border-b border-black font-bold text-blue-700 text-right px-2 align-middle bg-gray-50 text-xs">${displayZuz}</td><td class="border-r border-b border-black font-bold text-black text-right px-2 align-middle bg-yellow-50 text-xs">${displayBal}</td><td class="border-r border-b border-black">${m2Input}</td><td class="border-b border-black">${matSelect}</td></tr>`;
         });
     });
     tbody.innerHTML = html;
