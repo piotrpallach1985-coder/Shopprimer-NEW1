@@ -99,7 +99,9 @@ export function updateAllStocks() {
             const isAdmin = currentUser && currentUser.role === 'admin';
             const canEditBefore = currentUser && (currentUser.indCanEditBefore !== undefined ? currentUser.indCanEditBefore : true);
             const canEditAfter = currentUser && (currentUser.indCanEditAfter !== undefined ? currentUser.indCanEditAfter : false);
-            const canAccept = currentUser && (currentUser.indCanAccept !== undefined ? currentUser.indCanAccept : isAdmin);
+            const indCanAccept = currentUser && (currentUser.indCanAccept !== undefined ? currentUser.indCanAccept : isAdmin);
+            const indCanAcceptUtylizacja = currentUser && (currentUser.indCanAcceptUtylizacja !== undefined ? currentUser.indCanAcceptUtylizacja : indCanAccept);
+            const canAccept = isUtylizacja ? indCanAcceptUtylizacja : indCanAccept;
             
             if ((!r.isAccepted && canEditBefore) || (r.isAccepted && canEditAfter)) {
                 btnAkcje += `<button onclick="editInduscoRecord(${idx})" class="text-white bg-blue-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-blue-800 leading-none">EDYTUJ</button>`;
@@ -108,10 +110,10 @@ export function updateAllStocks() {
             if (canAccept) {
                 if (!r.isAccepted) {
                     if (r.rejectionComment) {
-                        btnAkcje += `<button onclick="acceptInduscoRecord(${idx})" class="text-white bg-green-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-green-700 leading-none">Zatwierdź</button>`;
+                        btnAkcje += `<button onclick="acceptInduscoRecord(${idx})" class="text-white bg-green-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-green-700 leading-none">POTWIERDŹ</button>`;
                     } else {
-                        btnAkcje += `<button onclick="acceptInduscoRecord(${idx})" class="text-white bg-green-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-green-700 leading-none">Zatwierdź</button>
-                                     <button onclick="rejectInduscoRecord(${idx})" class="text-white bg-red-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-red-700 leading-none">Odrzuć</button>`;
+                        btnAkcje += `<button onclick="acceptInduscoRecord(${idx})" class="text-white bg-green-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-green-700 leading-none">POTWIERDŹ</button>
+                                     <button onclick="rejectInduscoRecord(${idx})" class="text-white bg-red-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-red-700 leading-none">ODRZUĆ</button>`;
                     }
                 }
             }
@@ -186,9 +188,13 @@ export function updateAllStocks() {
                                 actionsHtml += `<button onclick="editHistoryItem('${p.id}', 'daily')" class="text-white bg-blue-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-blue-800 leading-none">EDYTUJ</button>`;
                             }
                             if (calcCanAccept) {
-                                if (!p.isAccepted && !p.rejectionComment) {
-                                    actionsHtml += `<button onclick="loadHistoryItem('${p.id}', 'daily', 'accept')" class="text-white bg-green-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-green-700 leading-none">POTWIERDŹ</button>`;
-                                    actionsHtml += `<button onclick="loadHistoryItem('${p.id}', 'daily', 'reject')" class="text-white bg-red-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-red-700 leading-none">ODRZUĆ</button>`;
+                                if (!p.isAccepted) {
+                                    if (p.rejectionComment) {
+                                        actionsHtml += `<button onclick="loadHistoryItem('${p.id}', 'daily', 'accept')" class="text-white bg-green-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-green-700 leading-none">POTWIERDŹ</button>`;
+                                    } else {
+                                        actionsHtml += `<button onclick="loadHistoryItem('${p.id}', 'daily', 'accept')" class="text-white bg-green-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-green-700 leading-none">POTWIERDŹ</button>`;
+                                        actionsHtml += `<button onclick="loadHistoryItem('${p.id}', 'daily', 'reject')" class="text-white bg-red-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-red-700 leading-none">ODRZUĆ</button>`;
+                                    }
                                 }
                             }
                             actionsHtml += `</div>`;
@@ -408,26 +414,46 @@ export function renderInduscoTable() {
             const isAdmin = currentUser && currentUser.role === 'admin';
             const canEditBefore = currentUser && (currentUser.indCanEditBefore !== undefined ? currentUser.indCanEditBefore : true);
             const canEditAfter = currentUser && (currentUser.indCanEditAfter !== undefined ? currentUser.indCanEditAfter : false);
-            const canAccept = currentUser && (currentUser.indCanAccept !== undefined ? currentUser.indCanAccept : isAdmin);
-            const canDelete = currentUser && (currentUser.indCanDelete !== undefined ? currentUser.indCanDelete : true);
+            
+            const indCanAccept = currentUser && (currentUser.indCanAccept !== undefined ? currentUser.indCanAccept : isAdmin);
+            const isUtylizacja = (row.actionType === 'utylizacja' || (row.amount < 0 && !row.isRemanent && row.actionType !== 'remanent'));
+            
+            const indCanAcceptUtylizacja = currentUser && (currentUser.indCanAcceptUtylizacja !== undefined ? currentUser.indCanAcceptUtylizacja : indCanAccept);
+            const canAccept = isUtylizacja ? indCanAcceptUtylizacja : indCanAccept;
+            
+            const indCanDelete = currentUser && (currentUser.indCanDelete !== undefined ? currentUser.indCanDelete : true);
+            const indCanDeleteAccepted = currentUser && (currentUser.indCanDeleteAccepted !== undefined ? currentUser.indCanDeleteAccepted : false);
+            
+            const indCanDeleteUtyl = currentUser && (currentUser.indCanDeleteUtylizacja !== undefined ? currentUser.indCanDeleteUtylizacja : indCanDelete);
+            const indCanDeleteAcceptedUtyl = currentUser && (currentUser.indCanDeleteAcceptedUtylizacja !== undefined ? currentUser.indCanDeleteAcceptedUtylizacja : indCanDeleteAccepted);
+            
+            const canDelete = isUtylizacja 
+                ? (currentUser && (!row.isAccepted ? indCanDeleteUtyl : indCanDeleteAcceptedUtyl))
+                : (currentUser && (!row.isAccepted ? indCanDelete : indCanDeleteAccepted));
+                
+            const indCanEditBeforeUtyl = currentUser && (currentUser.indCanEditBeforeUtylizacja !== undefined ? currentUser.indCanEditBeforeUtylizacja : canEditBefore);
+            const indCanEditAfterUtyl = currentUser && (currentUser.indCanEditAfterUtylizacja !== undefined ? currentUser.indCanEditAfterUtylizacja : canEditAfter);
+            
+            const finalCanEditBefore = isUtylizacja ? indCanEditBeforeUtyl : canEditBefore;
+            const finalCanEditAfter = isUtylizacja ? indCanEditAfterUtyl : canEditAfter;
 
-            if ((!row.isAccepted && canEditBefore) || (row.isAccepted && canEditAfter)) {
+            if ((!row.isAccepted && finalCanEditBefore) || (row.isAccepted && finalCanEditAfter)) {
                 akcjeHtml += `<button onclick="editInduscoRecord(${i})" class="w-full text-white bg-blue-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-blue-800 leading-none">EDYTUJ</button>`;
             }
             
             if (canAccept) {
                 if (!row.isAccepted) {
                     if (row.rejectionComment) {
-                         akcjeHtml += `<button onclick="acceptInduscoRecord(${i})" class="w-full text-white bg-green-600 font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-green-700 leading-none">Zatwierdź</button>`;
+                         akcjeHtml += `<button onclick="acceptInduscoRecord(${i})" class="w-full text-white bg-green-600 font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-green-700 leading-none">POTWIERDŹ</button>`;
                     } else {
-                         akcjeHtml += `<button onclick="acceptInduscoRecord(${i})" class="w-full text-white bg-green-600 font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-green-700 leading-none">Zatwierdź</button>
-                                       <button onclick="rejectInduscoRecord(${i})" class="w-full text-white bg-red-600 font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-red-700 leading-none">Odrzuć</button>`;
+                         akcjeHtml += `<button onclick="acceptInduscoRecord(${i})" class="w-full text-white bg-green-600 font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-green-700 leading-none">POTWIERDŹ</button>
+                                       <button onclick="rejectInduscoRecord(${i})" class="w-full text-white bg-red-600 font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-red-700 leading-none">ODRZUĆ</button>`;
                     }
                 }
             }
             
-            if (isAdmin || canDelete) {
-                akcjeHtml += `<button onclick="removeInduscoRecord(${i})" class="w-full text-black font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-black hover:text-white bg-white leading-none">Usuń</button>`;
+            if (canDelete) {
+                akcjeHtml += `<button onclick="removeInduscoRecord(${i})" class="w-full text-black font-bold uppercase text-[10px] border border-black px-1 py-0.5 hover:bg-black hover:text-white bg-white leading-none">USUŃ</button>`;
             }
             akcjeHtml += `</div>`;
 
@@ -1005,6 +1031,11 @@ export function renderDailyLedger() {
     }
 
     tfoot.innerHTML = `<tr><td colspan="2" class="px-2 py-1.5 border-r border-black text-right uppercase text-black font-bold bg-gray-200">SUMA W MIESIĄCU:</td><td class="px-2 py-1.5 border-r border-black text-green-700 font-bold text-center bg-gray-200 text-sm">${formatNumber(sumDostawa)}</td><td class="px-2 py-1.5 border-r border-black text-red-600 font-bold text-center bg-gray-200 text-sm">${formatNumber(sumUtylizacja)}</td><td class="px-2 py-1.5 border-r border-black font-bold text-right px-2 bg-gray-200 text-blue-700 text-sm">${formatNumber(sumZuzycie)}</td><td class="px-2 py-1.5 border-r border-black font-bold bg-yellow-100 text-black text-right px-2 text-sm">${formatNumber(eomBalance)}</td><td class="px-2 py-1.5 border-r border-black text-blue-700 font-bold text-center bg-gray-200 text-sm">${formatNumber(sumM2)}</td><td colspan="3" class="px-2 py-1.5 bg-gray-200 border-black print-hide"></td></tr>`;
+    
+    setTimeout(() => {
+        const tableContainer = document.querySelector('#view-daily .overflow-auto');
+        if (tableContainer) tableContainer.scrollTop = tableContainer.scrollHeight;
+    }, 50);
 }
 
 export function renderDailyInduscoSidebar() {
@@ -1228,6 +1259,11 @@ export function renderDailyInduscoLedger() {
     });
     tbody.innerHTML = html;
     tfoot.innerHTML = `<tr><td colspan="2" class="px-2 py-1.5 border-r border-black text-right uppercase text-black font-bold bg-gray-200">SUMA Z MIESIĄCA (BEZ SKRAJNYCH DNI):</td><td class="px-2 py-1.5 border-r border-black text-green-700 font-bold text-center bg-gray-200 text-sm">${formatNumber(sumWydanie)}</td><td class="px-2 py-1.5 border-r border-black text-red-600 font-bold text-center bg-gray-200 text-sm">${formatNumber(sumUtylizacja)}</td><td class="px-2 py-1.5 border-r border-black font-bold text-right bg-gray-200 text-blue-700 text-sm">${formatNumber(sumZuzycie)}</td><td class="px-2 py-1.5 border-r border-black font-bold bg-yellow-100 text-black text-right text-sm">${formatNumber(currentBalance)}</td><td class="px-2 py-1.5 border-r border-black text-blue-700 font-bold text-right bg-gray-200 text-sm">${formatNumber(sumM2)}</td><td class="bg-gray-200 border-black"></td></tr>`;
+    
+    setTimeout(() => {
+        const tableContainer = document.querySelector('#view-daily-indusco .overflow-auto');
+        if (tableContainer) tableContainer.scrollTop = tableContainer.scrollHeight;
+    }, 50);
 }
 
 // Bindowanie do window

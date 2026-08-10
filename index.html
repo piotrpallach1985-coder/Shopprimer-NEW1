@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pl">
 <head>
     <meta charset="UTF-8">
@@ -53,7 +53,7 @@
         </div>
     </div>
 
-    <!-- MODAL POWIADOMIEŃ -->
+    <!-- MODAL POWIADOMIEĹ -->
     <div id="notificationsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 z-[3500] hidden items-center justify-center print-hide">
         <div class="bg-white border-2 border-black p-6 w-full max-w-lg shadow-2xl relative flex flex-col max-h-[90vh]">
             <h2 class="text-lg font-bold text-black uppercase border-b-2 border-black pb-2 mb-4 flex items-center gap-2">
@@ -164,7 +164,7 @@
         </div>
     </div>
 
-    <!-- MODAL REGUŁ FARBY -->
+    <!-- MODAL REGUĹ FARBY -->
     <div id="paintRulesModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 z-[1050] hidden items-center justify-center print-hide">
         <div class="bg-white border-2 border-black p-6 w-full max-w-sm shadow-2xl relative flex flex-col">
             <h2 class="text-lg font-bold text-black uppercase border-b-2 border-black pb-2 mb-4">Reguły dla: <span id="paintRulesTitle" class="text-blue-600"></span></h2>
@@ -191,7 +191,7 @@
 
     <!-- MODAL EDYCJI UŻYTKOWNIKA -->
     <div id="editUserModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 z-[1050] hidden items-center justify-center print-hide">
-        <div class="bg-white border-2 border-black p-6 w-full max-w-md shadow-2xl relative flex flex-col max-h-[90vh]">
+        <div class="bg-white border-2 border-black p-6 w-[95vw] max-w-[95vw] shadow-2xl relative flex flex-col max-h-[95vh]">
             <h2 class="text-lg font-bold text-black uppercase border-b-2 border-black pb-2 mb-4">Edycja Użytkownika</h2>
             <div class="space-y-3 mb-4 overflow-y-auto flex-1 pr-2">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -216,7 +216,7 @@
                     </div>
                 </div>
 
-                <div id="editUserActionsContainer" class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div id="editUserActionsContainer" class="mt-2 grid grid-cols-1 md:grid-cols-3 gap-2">
                     <div class="border border-black p-2 bg-gray-50">
                         <label class="block text-xs font-bold text-black mb-2 uppercase border-b border-gray-300 pb-1">Kalkulacje (Zestawienia)</label>
                         <div class="space-y-1.5">
@@ -234,17 +234,46 @@
                             </label>
                             <label class="flex items-center gap-2 cursor-pointer bg-white p-1.5 border border-black hover:bg-gray-100">
                                 <input type="checkbox" id="editUserCalcCanDelete" class="w-4 h-4 cursor-pointer" checked>
-                                <span class="text-[11px] font-bold uppercase">Usuwanie wpisów</span>
+                                <span class="text-[11px] font-bold uppercase">Usuwanie wpisów przed akceptacją</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer bg-white p-1.5 border border-black hover:bg-gray-100">
+                                <input type="checkbox" id="editUserCalcCanDeleteAccepted" class="w-4 h-4 cursor-pointer">
+                                <span class="text-[11px] font-bold uppercase">Usuwanie zaakceptowanych wpisów</span>
                             </label>
                         </div>
                     </div>
                     <div class="border border-black p-2 bg-gray-50">
-                        <label class="block text-xs font-bold text-black mb-2 uppercase border-b border-gray-300 pb-1">Farby (Indusco)</label>
+                        
+                          <label class="block text-xs font-bold text-black mb-2 uppercase border-b border-gray-300 pb-1">Utylizacja (Zewnętrzna)</label>
+                          <div class="space-y-1.5 mb-4">
+                              <label class="flex items-center gap-2 cursor-pointer bg-white p-1.5 border border-black hover:bg-gray-100">
+                                  <input type="checkbox" id="editUserIndCanAcceptUtylizacja" class="w-4 h-4 cursor-pointer">
+                                  <span class="text-[11px] font-bold uppercase">Zatwierdzanie utylizacji</span>
+                              </label>
+                              <label class="flex items-center gap-2 cursor-pointer bg-white p-1.5 border border-black hover:bg-gray-100">
+                                  <input type="checkbox" id="editUserIndCanEditBeforeUtylizacja" class="w-4 h-4 cursor-pointer">
+                                  <span class="text-[11px] font-bold uppercase">Edycja PRZED akc.</span>
+                              </label>
+                              <label class="flex items-center gap-2 cursor-pointer bg-white p-1.5 border border-black hover:bg-gray-100">
+                                  <input type="checkbox" id="editUserIndCanEditAfterUtylizacja" class="w-4 h-4 cursor-pointer">
+                                  <span class="text-[11px] font-bold uppercase">Edycja PO akc.</span>
+                              </label>
+                              <label class="flex items-center gap-2 cursor-pointer bg-white p-1.5 border border-black hover:bg-gray-100">
+                                  <input type="checkbox" id="editUserIndCanDeleteUtylizacja" class="w-4 h-4 cursor-pointer">
+                                  <span class="text-[11px] font-bold uppercase">Usuwanie PRZED akc.</span>
+                              </label>
+                              <label class="flex items-center gap-2 cursor-pointer bg-white p-1.5 border border-black hover:bg-gray-100">
+                                  <input type="checkbox" id="editUserIndCanDeleteAcceptedUtylizacja" class="w-4 h-4 cursor-pointer">
+                                  <span class="text-[11px] font-bold uppercase">Usuwanie PO akc.</span>
+                              </label>
+                          </div>
+<label class="block text-xs font-bold text-black mb-2 uppercase border-b border-gray-300 pb-1">Farby (Indusco)</label>
                         <div class="space-y-1.5">
                             <label class="flex items-center gap-2 cursor-pointer bg-white p-1.5 border border-black hover:bg-gray-100">
                                 <input type="checkbox" id="editUserIndCanAccept" class="w-4 h-4 cursor-pointer" checked>
                                 <span class="text-[11px] font-bold uppercase">Przycisk Akceptuj/Odrzuć</span>
                             </label>
+                            
                             <label class="flex items-center gap-2 cursor-pointer bg-white p-1.5 border border-black hover:bg-gray-100">
                                 <input type="checkbox" id="editUserIndCanEditBefore" class="w-4 h-4 cursor-pointer" checked>
                                 <span class="text-[11px] font-bold uppercase">Edycja PRZED akceptacją</span>
@@ -255,7 +284,11 @@
                             </label>
                             <label class="flex items-center gap-2 cursor-pointer bg-white p-1.5 border border-black hover:bg-gray-100">
                                 <input type="checkbox" id="editUserIndCanDelete" class="w-4 h-4 cursor-pointer" checked>
-                                <span class="text-[11px] font-bold uppercase">Usuwanie wpisów</span>
+                                <span class="text-[11px] font-bold uppercase">Usuwanie wpisów przed akceptacją</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer bg-white p-1.5 border border-black hover:bg-gray-100">
+                                <input type="checkbox" id="editUserIndCanDeleteAccepted" class="w-4 h-4 cursor-pointer">
+                                <span class="text-[11px] font-bold uppercase">Usuwanie zaakceptowanych wpisów</span>
                             </label>
                             <label class="flex items-center gap-2 cursor-pointer bg-white p-1.5 border border-black hover:bg-gray-100">
                                 <input type="checkbox" id="editUserHideInduscoReq" class="w-4 h-4 cursor-pointer">
@@ -290,9 +323,9 @@
                     <thead class="bg-gray-100 text-black font-bold sticky top-0 border-b-2 border-black uppercase">
                         <tr>
                             <th class="px-3 py-2 border-r border-black">Jednostka / Projekt</th>
-                            <th class="px-3 py-2 border-r border-black text-right">Blachy [m²]</th>
-                            <th class="px-3 py-2 border-r border-black text-right">Profile [m²]</th>
-                            <th class="px-3 py-2 border-r border-black text-right">Suma Pow. [m²]</th>
+                            <th class="px-3 py-2 border-r border-black text-right">Blachy [mÂ˛]</th>
+                            <th class="px-3 py-2 border-r border-black text-right">Profile [mÂ˛]</th>
+                            <th class="px-3 py-2 border-r border-black text-right">Suma Pow. [mÂ˛]</th>
                             <th class="px-3 py-2 text-right">Koszty Całkowite [PLN]</th>
                         </tr>
                     </thead>
@@ -374,7 +407,7 @@
             </div>
         </header>
 
-        <!-- ZAKŁADKI -->
+        <!-- ZAKĹADKI -->
         <div class="flex flex-wrap items-end space-x-1 border-b-2 border-black mt-2 print-hide px-1 gap-y-1 relative sticky top-0 bg-white z-50 pt-2 pb-1" id="mainTabsContainer">
             <button id="tab-daily" onclick="switchTab('daily')" class="px-2 py-1.5 border-2 border-black border-b-0 bg-white text-black text-xs font-bold focus:outline-none whitespace-nowrap z-10">
                 ROZLICZENIE DZIENNE
@@ -422,7 +455,7 @@
                     <div class="bg-gray-100 p-2 font-bold text-sm border-b border-black flex justify-between items-center gap-2">
                         <span class="uppercase whitespace-nowrap">MENU FARB</span>
                         <div class="flex items-center gap-1">
-                            <button onclick="openConfigDailyPaints()" class="border border-black px-1.5 py-0.5 bg-white hover:bg-gray-200 text-xs font-bold" title="Konfiguruj widoczne farby">⚙️</button>
+                            <button onclick="openConfigDailyPaints()" class="border border-black px-1.5 py-0.5 bg-white hover:bg-gray-200 text-xs font-bold" title="Konfiguruj widoczne farby">&#9881;</button>
                             <button onclick="toggleDailySidebar()" class="border border-black px-2 py-0.5 bg-white hover:bg-gray-200 text-xs font-bold" title="Zamknij menu">X</button>
                         </div>
                     </div>
@@ -440,11 +473,11 @@
                             <h2 id="dailySelectedPaintTitle" class="text-lg font-bold text-blue-600 uppercase tracking-wider">WYBIERZ FARBĘ</h2>
                         </div>
                         <div class="flex items-center gap-2 flex-wrap">
-                            <!-- DODANY WYBÓR MIESIĄCA DLA GŁÓWNEGO ROZLICZENIA DZIENNEGO -->
+                            <!-- DODANY WYBÓR MIESIĄCA DLA GĹÓWNEGO ROZLICZENIA DZIENNEGO -->
                             <div class="flex items-center gap-1 mr-2">
                                 <label class="text-[10px] font-bold uppercase mr-1">Miesiąc:</label>
                                 <button onclick="changeDailyMonth(-1)" class="border border-black px-2 py-1 text-xs font-bold bg-white hover:bg-gray-200 transition">&lt;</button>
-                                <input type="month" id="dailyMonthInput" onchange="renderDailyLedger()" class="border border-black p-1 text-xs outline-none bg-white font-bold cursor-pointer hover:bg-gray-100">
+                                <input type="month" id="dailyMonthInput" onchange="renderDailyLedger()" class="border-2 border-green-700 p-1 text-xs outline-none bg-green-100 font-bold cursor-pointer hover:bg-green-200 text-green-900 shadow-sm transition">
                                 <button onclick="changeDailyMonth(1)" class="border border-black px-2 py-1 text-xs font-bold bg-white hover:bg-gray-200 transition">&gt;</button>
                             </div>
                             <div class="flex items-center gap-1 ml-2">
@@ -470,9 +503,9 @@
                                     <th class="px-2 py-1 border-r border-black text-green-700 w-20">WYDANIE [L]</th>
                                     <th class="px-2 py-1 border-r border-black text-red-600 w-20">UTYLIZACJA [L]</th>
                                     <th class="px-2 py-1 border-r border-black text-blue-700 w-20">ZUŻYCIE [L]</th>
-                                    <th class="px-2 py-1 border-r border-black bg-yellow-100 w-20">POZOSTAŁO [L]</th>
+                                    <th class="px-2 py-1 border-r border-black bg-yellow-100 w-20">POZOSTAĹO [L]</th>
                                     <th class="px-2 py-1 border-r border-black text-blue-700 w-20">ILOŚĆ M2</th>
-                                    <th class="px-2 py-1 border-r border-black w-28">RODZAJ MATERIAŁU</th>
+                                    <th class="px-2 py-1 border-r border-black w-28">RODZAJ MATERIAĹU</th>
                                     <th class="px-2 py-1 border-r border-black w-28">KALKULACJA</th>
                                     <th class="px-2 py-1 print-hide w-16">AKCJE</th>
                                 </tr>
@@ -513,7 +546,7 @@
                             <div class="flex items-center gap-1 mr-2">
                                 <label class="text-[10px] font-bold uppercase mr-1">Miesiąc:</label>
                                 <button onclick="changeInduscoMonth(-1)" class="border border-black px-2 py-1 text-xs font-bold bg-white hover:bg-gray-200 transition">&lt;</button>
-                                <input type="month" id="induscoDailyMonthInput" onchange="renderDailyInduscoLedger()" class="border border-black p-1 text-xs outline-none bg-white font-bold cursor-pointer hover:bg-gray-100">
+                                <input type="month" id="induscoDailyMonthInput" onchange="renderDailyInduscoLedger()" class="border-2 border-green-700 p-1 text-xs outline-none bg-green-100 font-bold cursor-pointer hover:bg-green-200 text-green-900 shadow-sm transition">
                                 <button onclick="changeInduscoMonth(1)" class="border border-black px-2 py-1 text-xs font-bold bg-white hover:bg-gray-200 transition">&gt;</button>
                             </div>
                             <button onclick="document.body.classList.add('print-daily-indusco'); window.print(); document.body.classList.remove('print-daily-indusco');" class="bg-black text-white px-3 py-1 font-bold text-xs uppercase shadow-md hover:bg-gray-800 ml-2">DRUKUJ (PDF)</button>
@@ -528,9 +561,9 @@
                                     <th class="px-2 py-1 border-r border-black text-green-700 w-20">DOSTAWA FARBY [L]</th>
                                     <th class="px-2 py-1 border-r border-black text-red-600 w-20">UTYLIZACJA [L]</th>
                                     <th class="px-2 py-1 border-r border-black text-blue-700 w-20">ZUŻYCIE [L]</th>
-                                    <th class="px-2 py-1 border-r border-black bg-yellow-100 w-20">POZOSTAŁO [L]</th>
+                                    <th class="px-2 py-1 border-r border-black bg-yellow-100 w-20">POZOSTAĹO [L]</th>
                                     <th class="px-2 py-1 border-r border-black text-blue-700 w-20">ILOŚĆ M2</th>
-                                    <th class="px-2 py-1 border-black w-28">RODZAJ MATERIAŁU</th>
+                                    <th class="px-2 py-1 border-black w-28">RODZAJ MATERIAĹU</th>
                                 </tr>
                             </thead>
                             <tbody id="dailyInduscoTableBody" class="divide-y divide-black bg-white"></tbody>
@@ -687,7 +720,7 @@
                     </h2>
                     <div class="flex items-center gap-3">
                         <div class="bg-white text-black border border-black px-3 py-1 font-bold text-sm">
-                            SUMA POW: <span id="totalArea">0,00</span> m²
+                            SUMA POW: <span id="totalArea">0,00</span> mÂ˛
                         </div>
                         <button onclick="clearInputData()" class="text-black bg-white border border-black hover:bg-gray-200 px-3 py-1.5 text-xs font-bold transition-colors uppercase print-hide">
                             Wyczyść
@@ -710,7 +743,7 @@
                                 <th class="px-1 py-1.5 border-r border-black text-center w-16">Dł.[mm]</th>
                                 <th class="px-1 py-1.5 border-r border-black text-center w-12">Ilość</th>
                                 <th class="px-1 py-1.5 border-r border-black text-right w-16">Mnożnik</th>
-                                <th class="px-1 py-1.5 border-r border-black text-right w-16" title="Można edytować ręcznie">Pow.[m²] ✎</th>
+                                <th class="px-1 py-1.5 border-r border-black text-right w-16" title="Można edytować ręcznie">Pow.[mÂ˛] âśŽ</th>
                                 <th class="px-1 py-1.5 border-r border-black w-16">Kolor</th>
                                 <th class="px-1 py-1.5 text-center print-hide action-col w-8">Akcja</th>
                             </tr>
@@ -892,7 +925,7 @@
                         <thead class="bg-gray-100 text-black font-bold uppercase border-b border-black">
                             <tr>
                                 <th class="px-3 py-2 border-r border-black">Projekt</th>
-                                <th class="px-3 py-2 border-r border-black text-right">Powierzchnia [m²]</th>
+                                <th class="px-3 py-2 border-r border-black text-right">Powierzchnia [mÂ˛]</th>
                                 <th class="px-3 py-2 border-r border-black text-right">Farba [L]</th>
                                 <th class="px-3 py-2 border-r border-black text-right">Rozcieńczalnik [L]</th>
                                 <th class="px-3 py-2 border-r border-black text-right">Koszt [PLN]</th>
@@ -915,7 +948,7 @@
                         <thead class="bg-gray-200 text-gray-700 font-bold uppercase border-b border-gray-400">
                             <tr>
                                 <th class="px-3 py-2 border-r border-gray-400">Projekt</th>
-                                <th class="px-3 py-2 border-r border-gray-400 text-right">Powierzchnia [m²]</th>
+                                <th class="px-3 py-2 border-r border-gray-400 text-right">Powierzchnia [mÂ˛]</th>
                                 <th class="px-3 py-2 border-r border-gray-400 text-right">Farba [L]</th>
                                 <th class="px-3 py-2 border-r border-gray-400 text-right">Rozcieńczalnik [L]</th>
                                 <th class="px-3 py-2 border-r border-gray-400 text-right">Koszt [PLN]</th>
@@ -953,7 +986,7 @@
                         <input type="text" id="formDbNazwa" placeholder="np. L200x200" class="w-full border border-black p-1 text-sm outline-none">
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-black mb-1 uppercase">Mnożnik [m²/m]</label>
+                        <label class="block text-xs font-bold text-black mb-1 uppercase">Mnożnik [mÂ˛/m]</label>
                         <input type="number" id="formDbMnoznik" step="0.001" min="0" placeholder="0.450" class="w-full border border-black p-1 text-sm outline-none">
                     </div>
                     <div>
@@ -988,7 +1021,7 @@
                         <thead class="bg-white text-black font-bold sticky top-0 uppercase border-b-2 border-black z-10">
                             <tr>
                                 <th class="px-3 py-2 border-r border-black">Nazwa Profilu</th>
-                                <th class="px-3 py-2 text-right border-r border-black">Mnożnik pow. ✎</th>
+                                <th class="px-3 py-2 text-right border-r border-black">Mnożnik pow. âśŽ</th>
                                 <th class="px-3 py-2 text-center w-16">Akcja</th>
                             </tr>
                         </thead>
@@ -1034,7 +1067,7 @@
             </div>
 
             <div class="bg-white p-4 border border-black print-hide">
-                <h2 class="text-sm font-bold text-black mb-3 border-b border-black pb-1 uppercase">Koszty Robocizny [PLN/m²]</h2>
+                <h2 class="text-sm font-bold text-black mb-3 border-b border-black pb-1 uppercase">Koszty Robocizny [PLN/mÂ˛]</h2>
                 <div class="flex gap-4 mb-6">
                     <div>
                         <label class="block text-xs font-bold text-black mb-1">Blachy</label>
@@ -1059,8 +1092,8 @@
                         <thead class="bg-gray-100 text-black font-bold uppercase border-b-2 border-black">
                             <tr>
                                 <th class="px-3 py-2 border-r border-black">Shopprimer</th>
-                                <th class="px-3 py-2 border-r border-black text-center">Wydajność Blachy [m²/l]</th>
-                                <th class="px-3 py-2 border-r border-black text-center">Wydajność Profile [m²/l]</th>
+                                <th class="px-3 py-2 border-r border-black text-center">Wydajność Blachy [mÂ˛/l]</th>
+                                <th class="px-3 py-2 border-r border-black text-center">Wydajność Profile [mÂ˛/l]</th>
                                 <th class="px-3 py-2 border-r border-black text-center">Rozcieńczalnik [%]</th>
                                 <th class="px-3 py-2 text-center w-16">Akcja</th>
                             </tr>
@@ -1141,7 +1174,7 @@
 
     </div>
 
-    <!-- POŁĄCZENIE Z GŁÓWNYM MODULEM JAVASCRIPT -->
+    <!-- POĹĄCZENIE Z GĹÓWNYM MODULEM JAVASCRIPT -->
     <script type="module" src="./js/main.js"></script>
 </body>
 </html>

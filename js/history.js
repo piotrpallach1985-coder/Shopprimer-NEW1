@@ -298,13 +298,13 @@ export async function loadHistoryItem(id, sourceTab = 'history', actionType = 'v
                     <span class="text-red-800 font-bold text-[10px] bg-red-100 px-2 py-1 border border-red-800 shadow-sm max-w-xs truncate" title="${escapeHTML(entry.rejectionComment)}">
                         <span class="uppercase">ODRZUCONO (${escapeHTML(entry.rejectedBy)}):</span> <span class="font-normal italic">${escapeHTML(entry.rejectionComment)}</span>
                     </span>
-                    <button onclick="acceptCurrentPreview()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 text-[10px] uppercase border border-black shadow-sm transition">WYJAŚNIONE (ZATWIERDŹ)</button>
+                    <button onclick="acceptCurrentPreview()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 text-[10px] uppercase border border-black shadow-sm transition">POTWIERDŹ</button>
                 </div>
             `;
         } else {
             let btnsHtml = '';
             if (actionType === 'accept') {
-                btnsHtml = `<button onclick="acceptCurrentPreview()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-4 text-xs uppercase border border-black shadow-sm transition">POTWIERDŹ PRZYJĘCIE</button>`;
+                btnsHtml = `<button onclick="acceptCurrentPreview()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-4 text-xs uppercase border border-black shadow-sm transition">POTWIERDŹ</button>`;
             } else if (actionType === 'reject') {
                 btnsHtml = `<button onclick="rejectCurrentPreview()" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-4 text-xs uppercase border border-black shadow-sm transition">ODRZUĆ (KOMENTARZ)</button>`;
             } // If 'view', btnsHtml remains empty.
@@ -578,22 +578,28 @@ export function renderHistoryTable() {
         const calcCanEditAfter = currentUser && (currentUser.calcCanEditAfter !== undefined ? currentUser.calcCanEditAfter : false);
         const calcCanAccept = currentUser && (currentUser.calcCanAccept !== undefined ? currentUser.calcCanAccept : isAdmin);
         const calcCanDelete = currentUser && (currentUser.calcCanDelete !== undefined ? currentUser.calcCanDelete : true);
+        const calcCanDeleteAccepted = currentUser && (currentUser.calcCanDeleteAccepted !== undefined ? currentUser.calcCanDeleteAccepted : false);
         
         const canEdit = currentUser && (!row.isAccepted ? calcCanEditBefore : calcCanEditAfter);
+        const canDelete = currentUser && (!row.isAccepted ? calcCanDelete : calcCanDeleteAccepted);
 
         if (canEdit) {
             actionsHtml += `<button onclick="editHistoryItem('${row.id}', 'history')" class="text-white bg-blue-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-blue-800 leading-none">EDYTUJ</button>`;
         }
 
         if (calcCanAccept) {
-            if (!row.isAccepted && !row.rejectionComment) {
-                actionsHtml += `<button onclick="loadHistoryItem('${row.id}', 'history', 'accept')" class="text-white bg-green-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-green-700 leading-none">POTWIERDŹ</button>`;
-                actionsHtml += `<button onclick="loadHistoryItem('${row.id}', 'history', 'reject')" class="text-white bg-red-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-red-700 leading-none">ODRZUĆ</button>`;
+            if (!row.isAccepted) {
+                if (row.rejectionComment) {
+                    actionsHtml += `<button onclick="loadHistoryItem('${row.id}', 'history', 'accept')" class="text-white bg-green-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-green-700 leading-none">POTWIERDŹ</button>`;
+                } else {
+                    actionsHtml += `<button onclick="loadHistoryItem('${row.id}', 'history', 'accept')" class="text-white bg-green-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-green-700 leading-none">POTWIERDŹ</button>`;
+                    actionsHtml += `<button onclick="loadHistoryItem('${row.id}', 'history', 'reject')" class="text-white bg-red-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-red-700 leading-none">ODRZUĆ</button>`;
+                }
             }
         }
         
-        if (calcCanDelete) {
-            actionsHtml += `<button onclick="deleteHistoryItemWithPin('${row.id}')" class="text-black font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-black hover:text-white bg-white leading-none mt-1">USUŃ</button>`;
+        if (canDelete) {
+            actionsHtml += `<button onclick="deleteHistoryItemWithPin('${row.id}')" class="text-black font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-black hover:text-white bg-white leading-none">USUŃ</button>`;
         }
 
         actionsHtml += `</div>`;

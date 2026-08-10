@@ -237,11 +237,18 @@ export function editUser(login) {
     const calcCanEditBeforeCb = document.getElementById('editUserCalcCanEditBefore');
     const calcCanEditAfterCb = document.getElementById('editUserCalcCanEditAfter');
     const calcCanDeleteCb = document.getElementById('editUserCalcCanDelete');
+    const calcCanDeleteAcceptedCb = document.getElementById('editUserCalcCanDeleteAccepted');
 
     const indCanAcceptCb = document.getElementById('editUserIndCanAccept');
+    const indCanAcceptUtylizacjaCb = document.getElementById('editUserIndCanAcceptUtylizacja');
+    const indCanEditBeforeUtylizacjaCb = document.getElementById('editUserIndCanEditBeforeUtylizacja');
+    const indCanEditAfterUtylizacjaCb = document.getElementById('editUserIndCanEditAfterUtylizacja');
+    const indCanDeleteUtylizacjaCb = document.getElementById('editUserIndCanDeleteUtylizacja');
+    const indCanDeleteAcceptedUtylizacjaCb = document.getElementById('editUserIndCanDeleteAcceptedUtylizacja');
     const indCanEditBeforeCb = document.getElementById('editUserIndCanEditBefore');
     const indCanEditAfterCb = document.getElementById('editUserIndCanEditAfter');
     const indCanDeleteCb = document.getElementById('editUserIndCanDelete');
+    const indCanDeleteAcceptedCb = document.getElementById('editUserIndCanDeleteAccepted');
     
     const hideInduscoReqCb = document.getElementById('editUserHideInduscoReq');
 
@@ -254,11 +261,18 @@ export function editUser(login) {
     if(calcCanEditBeforeCb) calcCanEditBeforeCb.checked = (u.calcCanEditBefore !== undefined) ? u.calcCanEditBefore : fallbackCanEdit;
     if(calcCanEditAfterCb) calcCanEditAfterCb.checked = (u.calcCanEditAfter !== undefined) ? u.calcCanEditAfter : false; // domyślnie false (tylko admin miał wcześniej dostęp)
     if(calcCanDeleteCb) calcCanDeleteCb.checked = (u.calcCanDelete !== undefined) ? u.calcCanDelete : fallbackCanDelete;
+    if(calcCanDeleteAcceptedCb) calcCanDeleteAcceptedCb.checked = (u.calcCanDeleteAccepted !== undefined) ? u.calcCanDeleteAccepted : false;
 
     if(indCanAcceptCb) indCanAcceptCb.checked = (u.indCanAccept !== undefined) ? u.indCanAccept : fallbackCanAccept;
+    if(indCanAcceptUtylizacjaCb) indCanAcceptUtylizacjaCb.checked = (u.indCanAcceptUtylizacja !== undefined) ? u.indCanAcceptUtylizacja : fallbackCanAccept;
+    if(indCanEditBeforeUtylizacjaCb) indCanEditBeforeUtylizacjaCb.checked = (u.indCanEditBeforeUtylizacja !== undefined) ? u.indCanEditBeforeUtylizacja : fallbackCanEdit;
+    if(indCanEditAfterUtylizacjaCb) indCanEditAfterUtylizacjaCb.checked = (u.indCanEditAfterUtylizacja !== undefined) ? u.indCanEditAfterUtylizacja : false;
+    if(indCanDeleteUtylizacjaCb) indCanDeleteUtylizacjaCb.checked = (u.indCanDeleteUtylizacja !== undefined) ? u.indCanDeleteUtylizacja : fallbackCanDelete;
+    if(indCanDeleteAcceptedUtylizacjaCb) indCanDeleteAcceptedUtylizacjaCb.checked = (u.indCanDeleteAcceptedUtylizacja !== undefined) ? u.indCanDeleteAcceptedUtylizacja : false;
     if(indCanEditBeforeCb) indCanEditBeforeCb.checked = (u.indCanEditBefore !== undefined) ? u.indCanEditBefore : fallbackCanEdit;
     if(indCanEditAfterCb) indCanEditAfterCb.checked = (u.indCanEditAfter !== undefined) ? u.indCanEditAfter : false;
     if(indCanDeleteCb) indCanDeleteCb.checked = (u.indCanDelete !== undefined) ? u.indCanDelete : fallbackCanDelete;
+    if(indCanDeleteAcceptedCb) indCanDeleteAcceptedCb.checked = (u.indCanDeleteAccepted !== undefined) ? u.indCanDeleteAccepted : false;
 
     if(hideInduscoReqCb) hideInduscoReqCb.checked = u.hideInduscoReq === true;
     
@@ -299,11 +313,18 @@ export async function saveEditUser() {
     const calcCanEditBeforeCb = document.getElementById('editUserCalcCanEditBefore');
     const calcCanEditAfterCb = document.getElementById('editUserCalcCanEditAfter');
     const calcCanDeleteCb = document.getElementById('editUserCalcCanDelete');
+    const calcCanDeleteAcceptedCb = document.getElementById('editUserCalcCanDeleteAccepted');
 
     const indCanAcceptCb = document.getElementById('editUserIndCanAccept');
+    const indCanAcceptUtylizacjaCb = document.getElementById('editUserIndCanAcceptUtylizacja');
+    const indCanEditBeforeUtylizacjaCb = document.getElementById('editUserIndCanEditBeforeUtylizacja');
+    const indCanEditAfterUtylizacjaCb = document.getElementById('editUserIndCanEditAfterUtylizacja');
+    const indCanDeleteUtylizacjaCb = document.getElementById('editUserIndCanDeleteUtylizacja');
+    const indCanDeleteAcceptedUtylizacjaCb = document.getElementById('editUserIndCanDeleteAcceptedUtylizacja');
     const indCanEditBeforeCb = document.getElementById('editUserIndCanEditBefore');
     const indCanEditAfterCb = document.getElementById('editUserIndCanEditAfter');
     const indCanDeleteCb = document.getElementById('editUserIndCanDelete');
+    const indCanDeleteAcceptedCb = document.getElementById('editUserIndCanDeleteAccepted');
     
     const hideInduscoReqCb = document.getElementById('editUserHideInduscoReq');
 
@@ -311,11 +332,18 @@ export async function saveEditUser() {
     if(calcCanEditBeforeCb) u.calcCanEditBefore = calcCanEditBeforeCb.checked;
     if(calcCanEditAfterCb) u.calcCanEditAfter = calcCanEditAfterCb.checked;
     if(calcCanDeleteCb) u.calcCanDelete = calcCanDeleteCb.checked;
+    if(calcCanDeleteAcceptedCb) u.calcCanDeleteAccepted = calcCanDeleteAcceptedCb.checked;
 
     if(indCanAcceptCb) u.indCanAccept = indCanAcceptCb.checked;
+    if(indCanAcceptUtylizacjaCb) u.indCanAcceptUtylizacja = indCanAcceptUtylizacjaCb.checked;
+    if(indCanEditBeforeUtylizacjaCb) u.indCanEditBeforeUtylizacja = indCanEditBeforeUtylizacjaCb.checked;
+    if(indCanEditAfterUtylizacjaCb) u.indCanEditAfterUtylizacja = indCanEditAfterUtylizacjaCb.checked;
+    if(indCanDeleteUtylizacjaCb) u.indCanDeleteUtylizacja = indCanDeleteUtylizacjaCb.checked;
+    if(indCanDeleteAcceptedUtylizacjaCb) u.indCanDeleteAcceptedUtylizacja = indCanDeleteAcceptedUtylizacjaCb.checked;
     if(indCanEditBeforeCb) u.indCanEditBefore = indCanEditBeforeCb.checked;
     if(indCanEditAfterCb) u.indCanEditAfter = indCanEditAfterCb.checked;
     if(indCanDeleteCb) u.indCanDelete = indCanDeleteCb.checked;
+    if(indCanDeleteAcceptedCb) u.indCanDeleteAccepted = indCanDeleteAcceptedCb.checked;
 
     if(hideInduscoReqCb) u.hideInduscoReq = hideInduscoReqCb.checked;
 
@@ -390,10 +418,17 @@ export async function addNewUser() {
         calcCanEditBefore: true,
         calcCanEditAfter: false,
         calcCanDelete: true,
+        calcCanDeleteAccepted: false,
         indCanAccept: true,
+        indCanAcceptUtylizacja: true,
+        indCanEditBeforeUtylizacja: true,
+        indCanEditAfterUtylizacja: false,
+        indCanDeleteUtylizacja: true,
+        indCanDeleteAcceptedUtylizacja: false,
         indCanEditBefore: true,
         indCanEditAfter: false,
         indCanDelete: true,
+        indCanDeleteAccepted: false,
         hideInduscoReq: false,
         lastModified: Date.now()
     }];
