@@ -1,7 +1,45 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pl">
 <head>
     <meta charset="UTF-8">
+<script>
+window.addEventListener('error', function(e) {
+    let errDiv = document.getElementById('global-error-log');
+    if (!errDiv) {
+        errDiv = document.createElement('div');
+        errDiv.id = 'global-error-log';
+        errDiv.style.position = 'fixed';
+        errDiv.style.top = '0';
+        errDiv.style.left = '0';
+        errDiv.style.width = '100%';
+        errDiv.style.backgroundColor = 'red';
+        errDiv.style.color = 'white';
+        errDiv.style.zIndex = '999999';
+        errDiv.style.padding = '10px';
+        errDiv.style.fontFamily = 'monospace';
+        document.body.appendChild(errDiv);
+    }
+    errDiv.innerHTML += e.message + ' at ' + e.filename + ':' + e.lineno + ':' + e.colno + '<br>';
+});
+window.addEventListener('unhandledrejection', function(e) {
+    let errDiv = document.getElementById('global-error-log');
+    if (!errDiv) {
+        errDiv = document.createElement('div');
+        errDiv.id = 'global-error-log';
+        errDiv.style.position = 'fixed';
+        errDiv.style.top = '0';
+        errDiv.style.left = '0';
+        errDiv.style.width = '100%';
+        errDiv.style.backgroundColor = 'orange';
+        errDiv.style.color = 'white';
+        errDiv.style.zIndex = '999999';
+        errDiv.style.padding = '10px';
+        errDiv.style.fontFamily = 'monospace';
+        document.body.appendChild(errDiv);
+    }
+    errDiv.innerHTML += 'Unhandled Promise: ' + e.reason + '<br>';
+});
+</script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Shopprimer kalkulator</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -494,7 +532,7 @@
                             <button onclick="printDailyLedger()" class="bg-black text-white px-3 py-1 font-bold text-xs uppercase shadow-md hover:bg-gray-800 ml-2">DRUKUJ (PDF)</button>
                         </div>
                     </div>
-                    <div class="flex-1 p-0">
+                    <div class="flex-1 p-0 overflow-auto max-h-[calc(100vh-250px)]">
                         <table class="w-full text-center text-[11px] md:text-xs whitespace-nowrap bg-white">
                             <thead class="bg-gray-100 text-black font-bold uppercase sticky top-0 border-b-2 border-black z-10">
                                 <tr>
@@ -503,9 +541,9 @@
                                     <th class="px-2 py-1 border-r border-black text-green-700 w-20">WYDANIE [L]</th>
                                     <th class="px-2 py-1 border-r border-black text-red-600 w-20">UTYLIZACJA [L]</th>
                                     <th class="px-2 py-1 border-r border-black text-blue-700 w-20">ZUŻYCIE [L]</th>
-                                    <th class="px-2 py-1 border-r border-black bg-yellow-100 w-20">POZOSTAĹO [L]</th>
+                                    <th class="px-2 py-1 border-r border-black bg-yellow-100 w-20">POZOSTAŁO [L]</th>
                                     <th class="px-2 py-1 border-r border-black text-blue-700 w-20">ILOŚĆ M2</th>
-                                    <th class="px-2 py-1 border-r border-black w-28">RODZAJ MATERIAĹU</th>
+                                    <th class="px-2 py-1 border-r border-black w-28">RODZAJ MATERIAĹ U</th>
                                     <th class="px-2 py-1 border-r border-black w-28">KALKULACJA</th>
                                     <th class="px-2 py-1 print-hide w-16">AKCJE</th>
                                 </tr>
@@ -552,7 +590,7 @@
                             <button onclick="document.body.classList.add('print-daily-indusco'); window.print(); document.body.classList.remove('print-daily-indusco');" class="bg-black text-white px-3 py-1 font-bold text-xs uppercase shadow-md hover:bg-gray-800 ml-2">DRUKUJ (PDF)</button>
                         </div>
                     </div>
-                    <div class="flex-1 p-0">
+                    <div class="flex-1 p-0 overflow-auto max-h-[calc(100vh-250px)]">
                         <table class="w-full text-center text-[11px] md:text-xs whitespace-nowrap bg-white">
                             <thead class="bg-gray-100 text-black font-bold uppercase sticky top-0 border-b-2 border-black z-10">
                                 <tr>
@@ -823,7 +861,7 @@
                 </div>
             </div>
 
-            <div class="overflow-x-auto overflow-y-hidden bg-white border-x border-b border-black">
+            <div class="overflow-x-auto max-h-[calc(100vh-250px)] overflow-y-auto bg-white border-x border-b border-black">
                 <table class="w-full text-left text-xs whitespace-nowrap">
                     <thead class="bg-gray-100 text-black font-bold sticky top-0 border-b-2 border-black uppercase">
                         <tr>
@@ -890,7 +928,7 @@
                 </div>
             </div>
             
-            <div class="overflow-x-auto overflow-y-hidden bg-white border-x border-b border-black">
+            <div class="overflow-x-auto max-h-[calc(100vh-250px)] overflow-y-auto bg-white border-x border-b border-black">
                 <table class="w-full text-left text-xs whitespace-nowrap">
                     <thead class="bg-gray-100 text-black font-bold uppercase border-b-2 border-black">
                         <tr>
@@ -971,6 +1009,7 @@
                         <select id="formDbKategoria" class="w-full border border-black p-1 text-sm outline-none">
                             <option value="Profile HP">Profile HP</option>
                             <option value="Kątowniki L">Kątowniki L</option>
+                            <option value="Płaskowniki FB">Płaskowniki FB</option>
                             <option value="Ceowniki UNP">Ceowniki UNP</option>
                             <option value="Teowniki T">Teowniki T</option>
                             <option value="Profile IPE">Profile IPE</option>
@@ -1178,3 +1217,6 @@
     <script type="module" src="./js/main.js"></script>
 </body>
 </html>
+
+
+
