@@ -6,7 +6,7 @@ import {
     database, inputData, resultsData, paintTypes, laborCosts, visibleDailyPaints,
     setResultsData, setInputData
 } from './store.js';
-import { firebaseDb, dbRef, dbSet, currentUser } from './auth.js';
+import { firestoreDb, fsDoc, fsSetDoc, currentUser } from './auth.js';
 
 // ==========================================
 // 1. NARZĘDZIA FORMULARZA (UI)
@@ -70,8 +70,12 @@ export function updateProfilSelect() {
     if (typ === 'Blacha') return;
     if (typ === 'Płaskowniki FB') {
         const fbSizes = [60, 80, 100, 120, 150, 200, 250, 300, 350, 400];
-        fbSizes.forEach(size => { const option = document.createElement('option'); option.value = `FB${size}`; option.textContent = `FB${size}`; select.appendChild(option); });
-        return;
+        fbSizes.forEach(size => { 
+            const val = `FB${size}`;
+            if (!database[typ] || database[typ][val] === undefined) {
+                const option = document.createElement('option'); option.value = val; option.textContent = val; select.appendChild(option); 
+            }
+        });
     }
     if (!database[typ]) return;
     const keys = Object.keys(database[typ]).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
@@ -106,7 +110,7 @@ export async function addManualDbItem() {
     document.getElementById('formDbNazwa').value = '';
     document.getElementById('formDbMnoznik').value = '';
 
-    renderDbTable(); updateProfilSelect(); dbSet(dbRef(firebaseDb, 'appState/database'), database);
+    renderDbTable(); updateProfilSelect(); if (firestoreDb) fsSetDoc(fsDoc(firestoreDb, 'settings', 'app'), { database: database }, { merge: true });
 
     if (isUpdate) await window.customAlert(`Zaktualizowano mnożnik dla profilu: ${safeKey}`);
     else await window.customAlert(`Dodano nowy profil: ${safeKey} do kategorii ${cat}`);
@@ -118,7 +122,7 @@ export async function updateDbMultiplier(cat, key, value) {
     if (!isNaN(num) && num > 0) {
         database[cat][key] = num;
         database.lastModified = Date.now();
-        updateProfilSelect(); calculate(); dbSet(dbRef(firebaseDb, 'appState/database'), database);
+        updateProfilSelect(); calculate(); if (firestoreDb) fsSetDoc(fsDoc(firestoreDb, 'settings', 'app'), { database: database }, { merge: true });
     } else {
         await window.customAlert("Podana wartość musi być liczbą większą od zera.");
         renderDbTable();
@@ -135,7 +139,7 @@ export async function removeDbItem(cat, key) {
             renderDbTable(); 
             updateProfilSelect(); 
             calculate(); 
-            dbSet(dbRef(firebaseDb, 'appState/database'), database);
+            if (firestoreDb) fsSetDoc(fsDoc(firestoreDb, 'settings', 'app'), { database: database }, { merge: true });
             await window.customAlert(`Profil ${key} został usunięty.`);
         }
     } else if (pin !== null) {
@@ -159,7 +163,6 @@ export function renderDbTable() {
     let totalCount = 0; let totalInDb = 0;
     
     for (const cat in database) {
-        if (cat === 'Płaskowniki FB') continue; 
         
         // Filtrowanie po wybranej kategorii
         if (selectedCategory && cat !== selectedCategory) continue;
@@ -205,7 +208,6 @@ export function renderDbTable() {
     if (dlProfile) {
         dlProfile.innerHTML = '';
         for (const cat in database) {
-            if (cat === 'Płaskowniki FB') continue; 
             Object.keys(database[cat]).forEach(k => {
                 const opt = document.createElement('option');
                 opt.value = k;
@@ -330,7 +332,7 @@ export function updateLaborCosts() {
     laborCosts.blachy = parseFloat(document.getElementById('costBlachy').value) || 4.20;
     laborCosts.profile = parseFloat(document.getElementById('costProfile').value) || 6.80;
     laborCosts.lastModified = Date.now();
-    calculateCosts(); dbSet(dbRef(firebaseDb, 'appState/laborCosts'), laborCosts);
+    calculateCosts(); if (firestoreDb) fsSetDoc(fsDoc(firestoreDb, 'settings', 'app'), { laborCosts: laborCosts }, { merge: true });
 }
 
 export function updatePaintParam(id, field, value) {
@@ -340,7 +342,7 @@ export function updatePaintParam(id, field, value) {
         const parsedValue = parseFloat(value.replace(',', '.')) || 0;
         pt[field] = Math.max(parsedValue, 0.1); 
         pt.lastModified = Date.now();
-        calculateCosts(); dbSet(dbRef(firebaseDb, 'appState/paintTypes'), paintTypes);
+        calculateCosts(); if (firestoreDb) fsSetDoc(fsDoc(firestoreDb, 'settings', 'app'), { paintTypes: paintTypes }, { merge: true });
     }
 }
 
@@ -366,8 +368,8 @@ export async function addPaintType() {
     if(window.renderDailySidebar) window.renderDailySidebar(); 
     if(window.renderHistoryTable) window.renderHistoryTable(); 
     
-    await dbSet(dbRef(firebaseDb, 'appState/paintTypes'), paintTypes);
-    if (visibleDailyPaints) await dbSet(dbRef(firebaseDb, 'appState/visibleDailyPaints'), visibleDailyPaints);
+    if (firestoreDb) await fsSetDoc(fsDoc(firestoreDb, 'settings', 'app'), { paintTypes: paintTypes }, { merge: true });
+    if (visibleDailyPaints && firestoreDb) await fsSetDoc(fsDoc(firestoreDb, 'settings', 'app'), { visibleDailyPaints: visibleDailyPaints }, { merge: true });
     await window.customAlert('Dodano nową farbę pomyślnie!');
 }
 
@@ -390,7 +392,7 @@ export async function removePaintType(id) {
         if(window.updateAllStocks) window.updateAllStocks(); 
         if(window.renderDailySidebar) window.renderDailySidebar(); 
         if(window.renderHistoryTable) window.renderHistoryTable(); 
-        await dbSet(dbRef(firebaseDb, 'appState/paintTypes'), paintTypes);
+        if (firestoreDb) await fsSetDoc(fsDoc(firestoreDb, 'settings', 'app'), { paintTypes: paintTypes }, { merge: true });
     }
 }
 
@@ -447,7 +449,7 @@ export function savePaintRules() {
     if(window.updateAllStocks) window.updateAllStocks(); 
     if(window.renderDailySidebar) window.renderDailySidebar();
     if(window.renderDailyLedger) window.renderDailyLedger();
-    dbSet(dbRef(firebaseDb, 'appState/paintTypes'), paintTypes);
+    if (firestoreDb) fsSetDoc(fsDoc(firestoreDb, 'settings', 'app'), { paintTypes: paintTypes }, { merge: true });
 }
 
 export function getInduscoPaintsHtml() {
@@ -629,8 +631,13 @@ export function calculate() {
             if (dlugosc > 0 && szerokosc > 0) { powierzchnia = (dlugosc / 1000) * (szerokosc / 1000) * ilosc * 2; mnoznik = formatNumber((szerokosc / 1000) * 2, 4); }
         } else if (bezpiecznyTyp === 'Płaskowniki FB' || typLower.includes('fb')) {
             ostatecznyTyp = "Płaskowniki FB";
-            const match = nazwa.match(/\d+/); const szerokoscZNazwy = match ? parseInt(match[0]) : 0;
-            if (szerokoscZNazwy > 0) { const wspl = 2 * (szerokoscZNazwy / 1000); mnoznik = formatNumber(wspl, 4); if (dlugosc > 0) powierzchnia = (dlugosc / 1000) * wspl * ilosc; }
+            if (database['Płaskowniki FB'] && database['Płaskowniki FB'][nazwa] !== undefined) {
+                const wspl = database['Płaskowniki FB'][nazwa];
+                mnoznik = formatNumber(wspl, 4); if (dlugosc > 0) powierzchnia = (dlugosc / 1000) * wspl * ilosc;
+            } else {
+                const match = nazwa.match(/\d+/); const szerokoscZNazwy = match ? parseInt(match[0]) : 0;
+                if (szerokoscZNazwy > 0) { const wspl = 2 * (szerokoscZNazwy / 1000); mnoznik = formatNumber(wspl, 4); if (dlugosc > 0) powierzchnia = (dlugosc / 1000) * wspl * ilosc; }
+            }
         } else {
             const searchKey = nazwa.toUpperCase(); let wspl = undefined;
             for (const cat in database) { if (database[cat] && database[cat][searchKey] !== undefined) { wspl = database[cat][searchKey]; ostatecznyTyp = cat; break; } }
