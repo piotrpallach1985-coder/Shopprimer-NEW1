@@ -3,7 +3,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
-import { getDatabase, ref, set, get, child, push, update, remove, onChildAdded, onChildChanged, onChildRemoved, onValue } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+import { getFirestore, collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // Twoja oryginalna konfiguracja
 const firebaseConfig = {
@@ -19,28 +19,26 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-const db = getDatabase(app);
+const db = getFirestore(app);
 
 try { const analytics = getAnalytics(app); } catch (e) { }
 
 // Dodajemy EKSPORTY wymagane przez plik store.js
-export const firebaseDb = db;
-export const dbRef = ref;
-export const dbSet = set;
-export const dbGet = get;
-export const dbPush = push;
-export const dbUpdate = update;
-export const dbRemove = remove;
-export const dbOnChildAdded = onChildAdded;
-export const dbOnChildChanged = onChildChanged;
-export const dbOnChildRemoved = onChildRemoved;
-export const dbOnValue = onValue;
+export const firestoreDb = db;
+export const fsCollection = collection;
+export const fsDoc = doc;
+export const fsSetDoc = setDoc;
+export const fsGetDoc = getDoc;
+export const fsGetDocs = getDocs;
+export const fsUpdateDoc = updateDoc;
+export const fsDeleteDoc = deleteDoc;
+export const fsOnSnapshot = onSnapshot;
 
-// Zachowujemy zgodność z Twoim oryginalnym kodem (przypisania globalne)
-window.firebaseDb = db;
-window.dbRef = ref;
-window.dbSet = set;
-window.dbGet = get;
+window.firestoreDb = db;
+window.firebaseAuth = auth;
+window.firebaseSignIn = signInWithEmailAndPassword;
+window.firebaseSignOut = signOut;
+
 window.firebaseAuth = auth;
 window.firebaseSignIn = signInWithEmailAndPassword;
 window.firebaseSignOut = signOut;
@@ -217,3 +215,20 @@ window.clearAllAlerts = function() {
 
 window.handleLogin = handleLogin;
 window.handleLogout = handleLogout;
+export function refreshCurrentUser(usersList) {
+    if (!window.firebaseUser) return;
+    const dbUser = usersList.find(u => u.login.toLowerCase() === window.firebaseUser.email.toLowerCase());
+    if (dbUser) {
+        currentUser = {
+            ...dbUser,
+            login: window.firebaseUser.email,
+            name: dbUser.name || (window.firebaseUser.displayName || window.firebaseUser.email.split('@')[0]), 
+            role: dbUser.role || 'user', 
+            allowedTabs: dbUser.allowedTabs || null,
+            preferredTabs: null
+        };
+        const nameElements = document.querySelectorAll('.logged-user-name, #loggedUserName, #currentUserNameDisplay');
+        nameElements.forEach(el => { el.textContent = currentUser.name; });
+        if (window.applyUserPermissions) window.applyUserPermissions();
+    }
+}

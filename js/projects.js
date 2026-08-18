@@ -2,16 +2,16 @@
 
 import { formatNumber, escapeHTML, parsePlDate } from './utils.js';
 import { projectsList, archivedProjectsList, printHistory } from './store.js';
-import { firebaseDb, dbRef, dbSet } from './auth.js';
+import { firestoreDb, fsDoc, fsSetDoc, fsDeleteDoc } from './auth.js';
 
 export function getProjectStats(projectName) {
     let stats = { area: 0, paint: 0, thinner: 0, cost: 0 };
-    const pName = (projectName || "").toUpperCase().trim();
+    const pName = String(projectName || "").toUpperCase().trim();
     if (!pName) return stats;
 
     printHistory.forEach(h => {
         if (h.isError) return;
-        const hName = (h.projectName || h.unit || "").toUpperCase().trim();
+        const hName = String(h.projectName || h.unit || "").toUpperCase().trim();
         if (hName === pName) {
             stats.area += (h.area || 0);
             stats.cost += (h.cost || 0);
@@ -93,21 +93,26 @@ export async function addProject() {
     if (!val) return;
     const isArchived = archivedProjectsList.some(p => (typeof p === 'object' ? p.name : p) === val);
     if (!projectsList.some(p => p.name === val) && !isArchived) {
-        projectsList.push({ name: val, date: new Date().toLocaleDateString('pl-PL'), lastModified: Date.now() });
+        const newProj = { name: val, date: new Date().toLocaleDateString('pl-PL'), lastModified: Date.now() };
+        projectsList.push(newProj);
         document.getElementById('formNewProjectName').value = '';
         renderProjectsList(); 
         if(window.renderInduscoTable) window.renderInduscoTable(); 
-        dbSet(dbRef(firebaseDb, 'appState/projectsList'), projectsList);
+        if (firestoreDb) {
+            newProj.id = "proj_" + Date.now();
+            fsSetDoc(fsDoc(firestoreDb, "projects", newProj.id), newProj);
+        }
     } else { await window.customAlert('Projekt już istnieje na liście (lub w archiwum)!'); }
 }
 
 export async function removeProject(index) {
     if(await window.customConfirm("Czy jesteś pewien, że chcesz trwale usunąć ten projekt z listy?")) {
         window.forceNextCloudOverwrite = true;
+        const toRemove = projectsList[index];
         projectsList.splice(index, 1); 
         renderProjectsList(); 
         if(window.renderInduscoTable) window.renderInduscoTable(); 
-        dbSet(dbRef(firebaseDb, 'appState/projectsList'), projectsList);
+        if (firestoreDb && toRemove.id) fsDeleteDoc(fsDoc(firestoreDb, "projects", toRemove.id));
     }
 }
 
@@ -144,12 +149,17 @@ export function renderArchiveList() {
 export async function archiveProject(index) {
     if(await window.customConfirm("Czy chcesz przenieść ten projekt do archiwum? Zniknie on z głównych list wyboru projektu.")) {
         window.forceNextCloudOverwrite = true;
-        archivedProjectsList.push({ name: projectsList[index].name, date: new Date().toLocaleDateString('pl-PL') });
+        const proj = projectsList[index];
+        const newArchived = { name: proj.name, date: new Date().toLocaleDateString('pl-PL') };
+        archivedProjectsList.push(newArchived);
         projectsList.splice(index, 1);
         renderProjectsList(); renderArchiveList(); 
         if(window.renderInduscoTable) window.renderInduscoTable(); 
-        dbSet(dbRef(firebaseDb, 'appState/projectsList'), projectsList);
-        dbSet(dbRef(firebaseDb, 'appState/archivedProjectsList'), archivedProjectsList);
+        if (firestoreDb) {
+            if(proj.id) fsDeleteDoc(fsDoc(firestoreDb, "projects", proj.id));
+            newArchived.id = "arch_" + Date.now();
+            fsSetDoc(fsDoc(firestoreDb, "archived_projects", newArchived.id), newArchived);
+        }
     }
 }
 
@@ -157,12 +167,17 @@ export async function unarchiveProject(index) {
     if(await window.customConfirm("Czy chcesz przywrócić ten projekt do aktywnych? Znów pojawi się na liście wyboru.")) {
         window.forceNextCloudOverwrite = true;
         let pName = typeof archivedProjectsList[index] === 'object' ? archivedProjectsList[index].name : archivedProjectsList[index];
-        projectsList.push({ name: pName, date: new Date().toLocaleDateString('pl-PL'), lastModified: Date.now() });
+        const proj = archivedProjectsList[index];
+        const newProj = { name: pName, date: new Date().toLocaleDateString('pl-PL'), lastModified: Date.now() };
+        projectsList.push(newProj);
         archivedProjectsList.splice(index, 1);
         renderProjectsList(); renderArchiveList(); 
         if(window.renderInduscoTable) window.renderInduscoTable(); 
-        dbSet(dbRef(firebaseDb, 'appState/projectsList'), projectsList);
-        dbSet(dbRef(firebaseDb, 'appState/archivedProjectsList'), archivedProjectsList);
+        if (firestoreDb) {
+            if (typeof proj === 'object' && proj.id) fsDeleteDoc(fsDoc(firestoreDb, "archived_projects", proj.id));
+            newProj.id = "proj_" + Date.now();
+            fsSetDoc(fsDoc(firestoreDb, "projects", newProj.id), newProj);
+        }
     }
 }
 

@@ -1,7 +1,7 @@
 // --- MODUŁ RAPORTÓW I WYKRESÓW PORÓWNAWCZYCH (REPORTS.JS) ---
 
 import { formatNumber, escapeHTML, parsePlDate, dateToISO, formatISOToPL } from './utils.js';
-import { printHistory, induscoDailyRecords, paintTypes, paintMonthlyCosts } from './store.js';
+import { printHistory, induscoDailyRecords, paintTypes, paintMonthlyCosts, induscoHistory } from './store.js';
 
 let chartM2Instance = null;
 let chartZuzInstance = null;
@@ -25,13 +25,26 @@ function populateMonthOptions(selectElement) {
         }
     });
 
+    induscoHistory.forEach(h => {
+        if (h.date) {
+            const d = parsePlDate(h.date);
+            if (!isNaN(d.getTime())) {
+                monthsSet.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+            }
+        }
+    });
+
     const sortedMonths = Array.from(monthsSet).sort().reverse();
     
-    if (selectElement.options.length === 0) {
-        selectElement.innerHTML = sortedMonths.map(m => {
-            const [y, mo] = m.split('-');
-            return `<option value="${m}">${mo}.${y}</option>`;
-        }).join('');
+    const currentVal = selectElement.value;
+    selectElement.innerHTML = sortedMonths.map(m => {
+        const [y, mo] = m.split('-');
+        return `<option value="${m}">${mo}.${y}</option>`;
+    }).join('');
+    
+    if (currentVal && sortedMonths.includes(currentVal)) {
+        selectElement.value = currentVal;
+    } else if (sortedMonths.length > 0) {
         selectElement.value = sortedMonths[0]; 
     }
 }
@@ -63,7 +76,7 @@ export function renderMonthlyReport() {
         if (h.isError) return;
         const rowDate = parsePlDate(h.date);
         if (rowDate.getFullYear() === parseInt(fYear) && (rowDate.getMonth() + 1) === parseInt(fMonth)) {
-            const pName = (h.projectName || h.unit || "BRAK NAZWY").toUpperCase().trim();
+            const pName = String(h.projectName || h.unit || "BRAK NAZWY").toUpperCase().trim();
             if (!units[pName]) units[pName] = { blachy: 0, profile: 0, area: 0, cost: 0 };
             
             units[pName].blachy += (h.areaBlachy || 0);
@@ -141,7 +154,7 @@ export function renderPaintReport() {
         if (h.isError) return;
         const rowDate = parsePlDate(h.date);
         if (rowDate.getFullYear() === parseInt(fYear) && (rowDate.getMonth() + 1) === parseInt(fMonth)) {
-            const pName = (h.projectName || h.unit || "BRAK NAZWY").toUpperCase().trim();
+            const pName = String(h.projectName || h.unit || "BRAK NAZWY").toUpperCase().trim();
             if (!units[pName]) units[pName] = {};
             
             if (h.brandStats) {

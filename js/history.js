@@ -8,7 +8,7 @@ import {
     setInputData, setPrintHistory 
 } from './store.js';
 
-import { currentUser, firebaseDb, dbRef, dbSet } from './auth.js';
+import { currentUser, firestoreDb, fsDoc, fsSetDoc, fsDeleteDoc } from './auth.js';
 
 export async function saveToSummaryInternal() {
     const dateInputVal = document.getElementById('protocolDateInput').value;
@@ -73,10 +73,12 @@ export async function saveToSummaryInternal() {
             authorStr += `<br><span class="text-[9px] text-red-500 font-normal">[Poprzednie odrzucenie przez ${escapeHTML(oldEntry.rejectedBy || 'System')}: ${escapeHTML(oldEntry.rejectionComment)}]</span>`;
         }
 
-        printHistory[existingEntryIndex] = {
+        const updatedEntry = {
             id: oldEntry.id, protocolNumber: oldEntry.protocolNumber, projectName: data.projectName, date: dateStr, unit: data.projectName, area: data.area, cost: data.cost, areaBlachy: data.areaBlachy, areaProfile: data.areaProfile, brandStats: data.brandStats, thinnerVol: totalThinner, isError: oldEntry.isError, author: authorStr, items: JSON.parse(JSON.stringify(data.items)), appliedRates: appliedRates, lastModified: Date.now(),
             isAccepted: false, acceptedBy: null, rejectionComment: null, rejectedBy: null
         };
+        printHistory[existingEntryIndex] = updatedEntry;
+        if (firestoreDb) fsSetDoc(fsDoc(firestoreDb, "history", updatedEntry.id), updatedEntry);
         generatedNumbers.push(oldEntry.protocolNumber);
         if (window.cancelEditMode) window.cancelEditMode();
     } else {
@@ -107,7 +109,7 @@ export async function saveToSummaryInternal() {
             const newProtocolNumber = `${currentMonthCounter}${suffix}`;
             generatedNumbers.push(newProtocolNumber);
             
-            printHistory.push({
+            const newEntry = {
                 id: Date.now() + Math.random().toString(36).substr(2, 9), 
                 protocolNumber: newProtocolNumber, 
                 projectName: data.projectName, 
@@ -128,7 +130,9 @@ export async function saveToSummaryInternal() {
                 acceptedBy: null,
                 rejectionComment: null,
                 rejectedBy: null
-            });
+            };
+            printHistory.push(newEntry);
+            if (firestoreDb) fsSetDoc(fsDoc(firestoreDb, "history", newEntry.id.toString()), newEntry);
         }
     }
     
@@ -142,9 +146,7 @@ export async function saveToSummaryInternal() {
         if(window.renderDailySidebar) window.renderDailySidebar(); 
         if(window.renderDailyLedger) window.renderDailyLedger(); 
     }
-    if (firebaseDb && dbSet && dbRef) {
-        dbSet(dbRef(firebaseDb, 'appState/printHistory'), printHistory);
-    }
+    // Zapisywanie do Firestore zostało przeniesione wyżej, do momentu tworzenia/edycji.
 }
 
 export async function saveToSummary() {
@@ -200,8 +202,8 @@ export async function acceptCurrentPreview() {
         };
         
         setPrintHistory(newHistory);
-        if (firebaseDb && dbSet && dbRef) {
-            dbSet(dbRef(firebaseDb, 'appState/printHistory'), newHistory);
+        if (firestoreDb) {
+            fsSetDoc(fsDoc(firestoreDb, "history", newHistory[index].id.toString()), newHistory[index]);
         }
         
         if (window.renderHistoryTable) window.renderHistoryTable();
@@ -236,8 +238,8 @@ export async function rejectCurrentPreview() {
         };
         
         setPrintHistory(newHistory);
-        if (firebaseDb && dbSet && dbRef) {
-            dbSet(dbRef(firebaseDb, 'appState/printHistory'), newHistory);
+        if (firestoreDb) {
+            fsSetDoc(fsDoc(firestoreDb, "history", newHistory[index].id.toString()), newHistory[index]);
         }
         
         if (window.renderHistoryTable) window.renderHistoryTable();
@@ -496,8 +498,8 @@ export async function deleteHistoryItemWithPin(id) {
                 if(window.renderDailySidebar) window.renderDailySidebar(); 
                 if(window.renderDailyLedger) window.renderDailyLedger(); 
             }
-            if (firebaseDb && dbSet && dbRef) {
-                dbSet(dbRef(firebaseDb, 'appState/printHistory'), printHistory);
+            if (firestoreDb) {
+                fsDeleteDoc(fsDoc(firestoreDb, "history", id.toString()));
             }
             await window.customAlert("Pomyślnie usunięto kalkulację.");
         }
@@ -518,7 +520,7 @@ export function renderHistoryTable() {
     
     const paintColsTh = paintTypes.map(pt => `<th class="px-3 py-2 border-r border-black text-right truncate max-w-[80px]" title="${pt.name}">${pt.name}[L]</th>`).join('');
 
-    theadTr.innerHTML = `<th class="px-3 py-2 border-r border-black">Nr Kalkulacji</th><th class="px-3 py-2 border-r border-black">Data</th><th class="px-3 py-2 border-r border-black">Jednostka</th><th class="px-3 py-2 border-r border-black text-right">Pow.[m²]</th>${paintColsTh}<th class="px-3 py-2 border-r border-black text-right">Rozc.[l]</th><th class="px-3 py-2 border-r border-black text-right">Koszty[PLN]</th><th class="px-3 py-2 border-r border-black">Autor & Akceptacja</th><th class="px-3 py-2 text-center print-hide">Akcja</th>`;
+    theadTr.innerHTML = `<th class="px-3 py-2 border-r border-black">Nr Kalkulacji</th><th class="px-3 py-2 border-r border-black">Data</th><th class="px-3 py-2 border-r border-black">Jednostka</th><th class="px-3 py-2 border-r border-black text-right">Pow.[m&sup2;]</th>${paintColsTh}<th class="px-3 py-2 border-r border-black text-right">Rozcieńczalnik [L]</th><th class="px-3 py-2 border-r border-black text-right">Koszty[PLN]</th><th class="px-3 py-2 border-r border-black">Autor & Akceptacja</th><th class="px-3 py-2 text-center print-hide">Akcja</th>`;
 
     tbody.innerHTML = '';
 

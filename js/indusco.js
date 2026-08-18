@@ -2,7 +2,7 @@
 
 import { formatNumber, escapeHTML, parsePlDate, parsePlDateToISO, formatISOToPL, dateToISO } from './utils.js';
 import { shopPrimerRules, ADMIN_PIN } from './config.js';
-import { firebaseDb, dbRef, dbSet, dbUpdate, dbRemove } from './auth.js';
+import { firestoreDb, fsDoc, fsSetDoc, fsUpdateDoc, fsDeleteDoc } from './auth.js';
 import { 
     paintTypes, induscoHistory, induscoDailyRecords, activeRemanentAlerts, activeInduscoRequests,
     projectsList, visibleDailyPaints, printHistory, autoSaveToDisk,
@@ -103,7 +103,12 @@ export function updateAllStocks() {
             const indCanAcceptUtylizacja = currentUser && (currentUser.indCanAcceptUtylizacja !== undefined ? currentUser.indCanAcceptUtylizacja : indCanAccept);
             const canAccept = isUtylizacja ? indCanAcceptUtylizacja : indCanAccept;
             
-            if ((!r.isAccepted && canEditBefore) || (r.isAccepted && canEditAfter)) {
+            const indCanEditBeforeUtyl = currentUser && (currentUser.indCanEditBeforeUtylizacja !== undefined ? currentUser.indCanEditBeforeUtylizacja : canEditBefore);
+            const indCanEditAfterUtyl = currentUser && (currentUser.indCanEditAfterUtylizacja !== undefined ? currentUser.indCanEditAfterUtylizacja : canEditAfter);
+            const finalCanEditBefore = isUtylizacja ? indCanEditBeforeUtyl : canEditBefore;
+            const finalCanEditAfter = isUtylizacja ? indCanEditAfterUtyl : canEditAfter;
+            
+            if ((!r.isAccepted && finalCanEditBefore) || (r.isAccepted && finalCanEditAfter)) {
                 btnAkcje += `<button onclick="editInduscoRecord(${idx})" class="text-white bg-blue-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-blue-800 leading-none">EDYTUJ</button>`;
             }
             
@@ -153,9 +158,6 @@ export function updateAllStocks() {
                     const canEdit = currentUser && (!p.isAccepted ? canEditBefore : canEditAfter);
                     const calcCanAccept = currentUser && (currentUser.calcCanAccept !== undefined ? currentUser.calcCanAccept : isAdmin);
 
-                    if (canEdit) {
-                        actionsHtml += `<button onclick="editHistoryItem('${p.id}', 'daily')" class="text-white bg-blue-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-blue-800 leading-none">EDYTUJ</button>`;
-                    }
                     if (calcCanAccept) {
                         if (!p.isAccepted && !p.rejectionComment) {
                             actionsHtml += `<button onclick="loadHistoryItem('${p.id}', 'daily', 'accept')" class="text-white bg-green-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-green-700 leading-none">POTWIERDŹ</button>`;
@@ -179,14 +181,8 @@ export function updateAllStocks() {
                         if (calcEvents[pName]) {
                             let actionsHtml = `<div class="flex flex-col gap-1 items-stretch w-16 mx-auto"><button onclick="loadHistoryItem('${p.id}', 'daily', 'view')" class="text-black font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-black hover:text-white bg-white leading-none print-hide">PODGLĄD</button>`;
                             const isAdmin = currentUser && currentUser.role === 'admin';
-                            const canEditBefore = currentUser && (currentUser.calcCanEditBefore !== undefined ? currentUser.calcCanEditBefore : true);
-                            const canEditAfter = currentUser && (currentUser.calcCanEditAfter !== undefined ? currentUser.calcCanEditAfter : false);
-                            const canEdit = currentUser && (!p.isAccepted ? canEditBefore : canEditAfter);
                             const calcCanAccept = currentUser && (currentUser.calcCanAccept !== undefined ? currentUser.calcCanAccept : isAdmin);
 
-                            if (canEdit) {
-                                actionsHtml += `<button onclick="editHistoryItem('${p.id}', 'daily')" class="text-white bg-blue-600 font-bold border border-black px-1 py-0.5 text-[10px] uppercase hover:bg-blue-800 leading-none">EDYTUJ</button>`;
-                            }
                             if (calcCanAccept) {
                                 if (!p.isAccepted) {
                                     if (p.rejectionComment) {
@@ -242,8 +238,10 @@ export function updateAllStocks() {
     induscoDailyRecords.forEach(r => {
         const m2 = parseFloat(r.m2) || 0;
         if (m2 > 0) {
-            if (!induscoZuzByDateAndPaint[r.date]) induscoZuzByDateAndPaint[r.date] = {};
-            const parts = r.paint.split(' - ');
+            const rDateIso = r.date.includes('.') ? parsePlDateToISO(r.date) : r.date;
+            if (!induscoZuzByDateAndPaint[rDateIso]) induscoZuzByDateAndPaint[rDateIso] = {};
+            const paintStr = r.paint || '';
+            const parts = paintStr.split(' - ');
             const brandId = parts[0];
             const isThinner = parts[1] === 'Rozcieńczalnik';
             if (!isThinner) {
@@ -257,29 +255,43 @@ export function updateAllStocks() {
                     } else { r.zuz = 0; r.thinnerZuz = 0; }
                 }
                 if (r.zuz > 0) {
-                    induscoZuzByDateAndPaint[r.date][r.paint] = (induscoZuzByDateAndPaint[r.date][r.paint] || 0) + r.zuz;
+                    induscoZuzByDateAndPaint[rDateIso][r.paint] = (induscoZuzByDateAndPaint[rDateIso][r.paint] || 0) + r.zuz;
                     const thinnerName = `${brandId} - Rozcieńczalnik`;
-                    induscoZuzByDateAndPaint[r.date][thinnerName] = (induscoZuzByDateAndPaint[r.date][thinnerName] || 0) + (r.thinnerZuz || 0);
+                    induscoZuzByDateAndPaint[rDateIso][thinnerName] = (induscoZuzByDateAndPaint[rDateIso][thinnerName] || 0) + (r.thinnerZuz || 0);
                 }
             }
         }
     });
 
+
+
     Object.entries(induscoZuzByDateAndPaint).forEach(([dateIso, paintsObj]) => {
         const dateObj = new Date(dateIso);
         Object.entries(paintsObj).forEach(([paint, zuz]) => {
-            if (zuz > 0 && indEvents[paint]) {
-                indEvents[paint].push({ dateObj, wydanie: 0, utylizacja: 0, zuzycie: zuz, rodzaj: 'ZUŻYCIE' });
+            let targetPaintStr = null;
+            for (let key in indEvents) {
+                if (key.toUpperCase() === paint.toUpperCase()) { targetPaintStr = key; break; }
+            }
+            if (zuz > 0 && targetPaintStr) {
+                indEvents[targetPaintStr].push({ dateObj, wydanie: 0, utylizacja: 0, zuzycie: zuz, rodzaj: 'ZUŻYCIE' });
             }
         });
     });
 
     induscoDailyRecords.forEach(r => {
         const wyd = parseFloat(r.wydanie) || 0; const uty = parseFloat(r.utylizacja) || 0;
-        if ((wyd > 0 || uty > 0) && indEvents[r.paint]) {
-            const dateObj = new Date(r.date);
-            if (wyd > 0) indEvents[r.paint].push({ dateObj, wydanie: wyd, utylizacja: 0, zuzycie: 0, rodzaj: 'WYDANIE' });
-            if (uty > 0) indEvents[r.paint].push({ dateObj, wydanie: 0, utylizacja: uty, zuzycie: 0, rodzaj: 'UTYLIZACJA' });
+        const paintStr = (r.paint || '').toUpperCase();
+        
+        let targetPaintStr = null;
+        for (let key in indEvents) {
+            if (key.toUpperCase() === paintStr) { targetPaintStr = key; break; }
+        }
+
+        if ((wyd > 0 || uty > 0) && targetPaintStr) {
+            const rDateIso = r.date.includes('.') ? parsePlDateToISO(r.date) : r.date;
+            const dateObj = new Date(rDateIso);
+            if (wyd > 0) indEvents[targetPaintStr].push({ dateObj, wydanie: wyd, utylizacja: 0, zuzycie: 0, rodzaj: 'WYDANIE' });
+            if (uty > 0) indEvents[targetPaintStr].push({ dateObj, wydanie: 0, utylizacja: uty, zuzycie: 0, rodzaj: 'UTYLIZACJA' });
         }
     });
 
@@ -516,18 +528,18 @@ export async function saveBulkIndusco() {
                     rejectedBy: null
                 };
                 induscoHistory.push(newItem);
-                await dbSet(dbRef(firebaseDb, 'appState/induscoHistory/' + newItem.id), newItem);
+                if(firestoreDb) await fsSetDoc(fsDoc(firestoreDb, 'indusco_history', (newItem.id).toString()), newItem)
                 
                 if (isRem) {
                     const newAlert = { id: Date.now().toString() + Math.random().toString(36).substr(2, 5), date: dateStr, paintType: paintType, author: currentUser ? (currentUser.name || currentUser.login) : "Nieznany" };
                     localAlerts.push(newAlert);
-                    await dbSet(dbRef(firebaseDb, 'appState/activeRemanentAlerts/' + newAlert.id), newAlert);
+                    if(firestoreDb) await fsSetDoc(fsDoc(firestoreDb, 'remanent_alerts', (newAlert.id).toString()), newAlert)
                 }
                 if (actionType === 'wydanie') {
                     const toRemove = localRequests.filter(req => req.paintType === paintType);
                     for (const req of toRemove) {
                         const fbKey = req.firebaseKey || req.id;
-                        await dbRemove(dbRef(firebaseDb, 'appState/activeInduscoRequests/' + fbKey));
+                        if(firestoreDb) await fsDeleteDoc(fsDoc(firestoreDb, 'indusco_requests', (fbKey).toString()))
                     }
                     localRequests = localRequests.filter(req => req.paintType !== paintType);
                 }
@@ -558,7 +570,7 @@ export async function acceptInduscoRecord(index) {
         
         if (window.setInduscoHistory) window.setInduscoHistory(induscoHistory);
         const fbKey = induscoHistory[index].firebaseKey || induscoHistory[index].id;
-        await dbUpdate(dbRef(firebaseDb, 'appState/induscoHistory/' + fbKey), induscoHistory[index]);
+        if(firestoreDb) await fsUpdateDoc(fsDoc(firestoreDb, 'indusco_history', (fbKey).toString()), induscoHistory[index])
         
         renderInduscoTable();
         if (document.getElementById('view-daily') && document.getElementById('view-daily').classList.contains('block')) { 
@@ -583,7 +595,7 @@ export async function rejectInduscoRecord(index) {
         
         if (window.setInduscoHistory) window.setInduscoHistory(induscoHistory);
         const fbKey = induscoHistory[index].firebaseKey || induscoHistory[index].id;
-        await dbUpdate(dbRef(firebaseDb, 'appState/induscoHistory/' + fbKey), induscoHistory[index]);
+        if(firestoreDb) await fsUpdateDoc(fsDoc(firestoreDb, 'indusco_history', (fbKey).toString()), induscoHistory[index])
         
         renderInduscoTable();
         if (document.getElementById('view-daily') && document.getElementById('view-daily').classList.contains('block')) { 
@@ -604,7 +616,7 @@ export async function removeInduscoRecord(index) {
         const itemToDelete = induscoHistory[index];
         const fbKey = itemToDelete.firebaseKey || idToRemove;
         induscoHistory.splice(index, 1); 
-        await dbRemove(dbRef(firebaseDb, 'appState/induscoHistory/' + fbKey));
+        if(firestoreDb) await fsDeleteDoc(fsDoc(firestoreDb, 'indusco_history', (fbKey).toString()))
         renderInduscoTable(); 
         if (document.getElementById('view-daily') && document.getElementById('view-daily').classList.contains('block')) { renderDailySidebar(); renderDailyLedger(); } 
     } else if (pin !== null) await window.customAlert("Nieprawidłowy kod PIN.");
@@ -613,14 +625,23 @@ export async function removeInduscoRecord(index) {
 export async function editInduscoRecord(index) {
     const record = induscoHistory[index];
     const isAdmin = currentUser && currentUser.role === 'admin';
+    
+    let isUtylizacja = record.actionType === 'utylizacja' || (record.amount < 0 && !record.isRemanent && record.actionType !== 'remanent');
+    const canEditBefore = currentUser && (currentUser.indCanEditBefore !== undefined ? currentUser.indCanEditBefore : true);
     const canEditAfter = currentUser && (currentUser.indCanEditAfter !== undefined ? currentUser.indCanEditAfter : false);
+    
+    const indCanEditBeforeUtyl = currentUser && (currentUser.indCanEditBeforeUtylizacja !== undefined ? currentUser.indCanEditBeforeUtylizacja : canEditBefore);
+    const indCanEditAfterUtyl = currentUser && (currentUser.indCanEditAfterUtylizacja !== undefined ? currentUser.indCanEditAfterUtylizacja : canEditAfter);
+    
+    const finalCanEditBefore = isUtylizacja ? indCanEditBeforeUtyl : canEditBefore;
+    const finalCanEditAfter = isUtylizacja ? indCanEditAfterUtyl : canEditAfter;
 
     if (record.isAccepted) {
-        if (!canEditAfter) {
+        if (!finalCanEditAfter && !isAdmin) {
             await window.customAlert("Ten wpis został zaakceptowany i jest zablokowany do edycji.");
             return;
         }
-        if (isAdmin) {
+        if (isAdmin || finalCanEditAfter) {
             const pin = await window.customPrompt("Ten wpis jest zaakceptowany. Podaj PIN aby edytować:", "password");
             if (pin !== ADMIN_PIN) {
                 if (pin !== null) await window.customAlert("Nieprawidłowy PIN.");
@@ -628,8 +649,7 @@ export async function editInduscoRecord(index) {
             }
         }
     } else {
-        const canEditBefore = currentUser && currentUser.indCanEditBefore !== false;
-        if (!isAdmin && !canEditBefore) {
+        if (!isAdmin && !finalCanEditBefore) {
             await window.customAlert("Brak uprawnień do edycji tego wpisu.");
             return;
         }
@@ -638,7 +658,6 @@ export async function editInduscoRecord(index) {
     document.getElementById('editInduscoDate').value = parsePlDateToISO(record.date);
     let baseType = record.paintType.replace(/<[^>]*>?/gm, '').trim().replace("REMANENT", "").trim();
     document.getElementById('editInduscoPaint').value = baseType;
-    let isUtylizacja = record.actionType === 'utylizacja' || (record.amount < 0 && !record.isRemanent && record.actionType !== 'remanent');
     let isRemanent = record.isRemanent || record.actionType === 'remanent';
     const actionEl = document.getElementById('editInduscoAction');
     if(actionEl) {
@@ -696,13 +715,13 @@ export async function saveEditIndusco() {
     if (!wasRem && isRem) {
         const newAlert = { id: Date.now().toString() + Math.random().toString(36).substr(2, 5), date: formatISOToPL(dIso), paintType: type, author: currentUser ? (currentUser.name || currentUser.login) : "System" };
         localAlerts.push(newAlert);
-        dbSet(dbRef(firebaseDb, 'appState/activeRemanentAlerts/' + newAlert.id), newAlert);
+        if(firestoreDb) await fsSetDoc(fsDoc(firestoreDb, 'remanent_alerts', (newAlert.id).toString()), newAlert)
     }
     if (actionType === 'wydanie') {
         const toRemove = localRequests.filter(req => req.paintType === type);
         for (const req of toRemove) {
             const fbKey = req.firebaseKey || req.id;
-            dbRemove(dbRef(firebaseDb, 'appState/activeInduscoRequests/' + fbKey));
+            if(firestoreDb) await fsDeleteDoc(fsDoc(firestoreDb, 'indusco_requests', (fbKey).toString()))
         }
         localRequests = localRequests.filter(req => req.paintType !== type);
     }
@@ -710,7 +729,7 @@ export async function saveEditIndusco() {
     setActiveRemanentAlerts(localAlerts);
     setActiveInduscoRequests(localRequests);
     const fbKey = induscoHistory[index].firebaseKey || induscoHistory[index].id;
-    dbUpdate(dbRef(firebaseDb, 'appState/induscoHistory/' + fbKey), induscoHistory[index]);
+    if(firestoreDb) await fsUpdateDoc(fsDoc(firestoreDb, 'indusco_history', (fbKey).toString()), induscoHistory[index])
 
     renderInduscoTable(); 
     if (document.getElementById('view-daily') && document.getElementById('view-daily').classList.contains('block')) { renderDailySidebar(); renderDailyLedger(); }
@@ -744,19 +763,28 @@ export function updateAlertsUI() {
         if (!window.initialAlertsShown) {
             window.initialAlertsShown = true;
             if (window.openNotificationsModal) window.openNotificationsModal();
+        } else {
+            const modal = document.getElementById('notificationsModal');
+            if (modal && !modal.classList.contains('hidden')) {
+                if (window.renderNotificationsList) window.renderNotificationsList();
+            }
         }
     } else {
         bellIcon.classList.remove('animate-pulse', 'text-red-600');
         badge.classList.add('hidden');
+        const modal = document.getElementById('notificationsModal');
+        if (modal && !modal.classList.contains('hidden')) {
+            if (window.closeNotificationsModal) window.closeNotificationsModal();
+        }
     }
 }
 
-export function acknowledgeRemanent(id) {
+export async function acknowledgeRemanent(id) {
     const newAlerts = activeRemanentAlerts.filter(a => a.id !== id);
     const itemToRemove = activeRemanentAlerts.find(a => a.id.toString() === id.toString());
     const fbKey = itemToRemove ? (itemToRemove.firebaseKey || id) : id;
     setActiveRemanentAlerts(newAlerts);
-    dbRemove(dbRef(firebaseDb, 'appState/activeRemanentAlerts/' + fbKey));
+    if(firestoreDb) await fsDeleteDoc(fsDoc(firestoreDb, 'remanent_alerts', (fbKey).toString()))
     updateAlertsUI();
     if(window.openNotificationsModal) window.openNotificationsModal();
 }
@@ -779,7 +807,7 @@ export async function submitInduscoRequest() {
         author: currentUser ? (currentUser.name || currentUser.login) : "System"
     };
     localReqs.push(newReq);
-    dbSet(dbRef(firebaseDb, 'appState/activeInduscoRequests/' + newReq.id), newReq);
+    if(firestoreDb) await fsSetDoc(fsDoc(firestoreDb, 'indusco_requests', (newReq.id).toString()), newReq)
     
     setActiveInduscoRequests(localReqs);
     updateAlertsUI();
@@ -1062,7 +1090,7 @@ export function renderDailyInduscoSidebar() {
     if (monthInput && !monthInput.value) monthInput.value = new Date().toISOString().slice(0, 7);
 }
 
-export function addInduscoDailyRow(dateIso) {
+export async function addInduscoDailyRow(dateIso) {
     if (!currentDailyInduscoPaint) return;
     const newRecords = [...induscoDailyRecords];
     const newRecord = {
@@ -1071,7 +1099,7 @@ export function addInduscoDailyRow(dateIso) {
     };
     newRecords.push(newRecord);
     setInduscoDailyRecords(newRecords);
-    dbSet(dbRef(firebaseDb, 'appState/induscoDailyRecords/' + newRecord.id), newRecord);
+    if(firestoreDb) await fsSetDoc(fsDoc(firestoreDb, 'indusco_daily', (newRecord.id).toString()), newRecord)
     renderDailyInduscoLedger();
     setTimeout(() => {
         const tableContainer = document.querySelector('#view-daily-indusco .overflow-auto');
@@ -1083,19 +1111,19 @@ export function addInduscoDailyRow(dateIso) {
     }, 50);
 }
 
-export function removeInduscoDailyRow(id) {
+export async function removeInduscoDailyRow(id) {
     window.forceNextCloudOverwrite = true;
     const newRecords = induscoDailyRecords.filter(r => r.id !== id);
     const itemToRemove = induscoDailyRecords.find(r => r.id.toString() === id.toString());
     const fbKey = itemToRemove ? (itemToRemove.firebaseKey || id) : id;
     setInduscoDailyRecords(newRecords);
-    dbRemove(dbRef(firebaseDb, 'appState/induscoDailyRecords/' + fbKey));
+    if(firestoreDb) await fsDeleteDoc(fsDoc(firestoreDb, 'indusco_daily', (fbKey).toString()))
     updateAllStocks();
     renderDailyInduscoSidebar();
     renderDailyInduscoLedger();
 }
 
-export function updateInduscoDailyRecord(id, dateIso, field, value) {
+export async function updateInduscoDailyRecord(id, dateIso, field, value) {
     let newRecords = [...induscoDailyRecords];
     let record = newRecords.find(r => r.id === id);
     if (!record && id.startsWith('new_')) {
@@ -1125,7 +1153,7 @@ export function updateInduscoDailyRecord(id, dateIso, field, value) {
         }
 
         setInduscoDailyRecords(newRecords);
-        dbSet(dbRef(firebaseDb, 'appState/induscoDailyRecords/' + record.id), record);
+        if(firestoreDb) await fsSetDoc(fsDoc(firestoreDb, 'indusco_daily', (record.id).toString()), record)
         updateAllStocks();
         renderDailyInduscoSidebar();
         renderDailyInduscoLedger();
@@ -1176,8 +1204,8 @@ export function renderDailyInduscoLedger() {
 
     datesToRender.forEach((dObj) => {
         const dateIso = dateToISO(dObj);
-        const displayDate = `${String(dObj.getDate()).padStart(2, '0')}.${String(dObj.getMonth() + 1).padStart(2, '0')}.${dObj.getFullYear()}`;
-        const isCurrentMonth = (dObj.getMonth() === month);
+        const displayDate = formatISOToPL(dateIso).substring(0, 5);
+        const isCurrentMonth = dObj.getMonth() === month;
         
         let dayWyd = 0, dayUty = 0, dayZuzTotal = 0;
         
@@ -1187,15 +1215,18 @@ export function renderDailyInduscoLedger() {
 
         currentBalance += dayWyd - dayUty - dayZuzTotal;
 
-        let dayRecords = induscoDailyRecords.filter(r => r.date === dateIso && r.paint === currentDailyInduscoPaint);
+        let dayRecords = induscoDailyRecords.filter(r => {
+            const rDateIso = r.date.includes('.') ? parsePlDateToISO(r.date) : r.date;
+            return rDateIso === dateIso && (r.paint || '').toUpperCase() === currentDailyInduscoPaint.toUpperCase();
+        });
         if (dayRecords.length === 0) dayRecords = [{ id: 'new_' + dateIso, date: dateIso, unit: '', wydanie: '', utylizacja: '', m2: '', matType: 'Blachy' }];
 
         let autoUnit = '';
         if (isThinnerCurrent) {
             const basePaintsUnits = new Set();
             induscoDailyRecords.filter(record => 
-                record.date === dateIso && record.paint.startsWith(currentBrandId + ' - ') && 
-                !record.paint.includes('Rozcieńczalnik') && record.unit && record.unit.trim() !== ''
+                record.date === dateIso && (record.paint || '').startsWith(currentBrandId + ' - ') && 
+                !(record.paint || '').includes('Rozcieńczalnik') && record.unit && record.unit.trim() !== ''
             ).forEach(record => basePaintsUnits.add(record.unit.trim().toUpperCase()));
             autoUnit = Array.from(basePaintsUnits).join(' + ');
         }
