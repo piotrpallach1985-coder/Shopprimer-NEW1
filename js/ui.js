@@ -7,7 +7,7 @@ import {
     setInputData, setUserPreferences, setUsersList 
 } from './store.js';
 
-import { currentUser, firebaseDb, dbRef, dbSet } from './auth.js';
+import { currentUser, firestoreDb, fsDoc, fsSetDoc, fsDeleteDoc } from './auth.js';
 import { AVAILABLE_TABS } from './config.js';
 import { formatNumber, escapeHTML, parsePlDateToISO, formatISOToPL, parsePlDate } from './utils.js';
 
@@ -363,7 +363,7 @@ export async function saveEditUser() {
         applyUserPermissions();
     }
     
-    dbSet(dbRef(firebaseDb, 'appState/appUsers'), usersList);
+    if (firestoreDb) fsSetDoc(fsDoc(firestoreDb, "users", u.login.replace(/[^a-zA-Z0-9]/g, '_')), u);
     closeEditUserModal();
     await customAlert("Zapisano zmiany uprawnień użytkownika.");
 }
@@ -379,13 +379,10 @@ export async function deleteUser(login) {
             const idx = usersList.findIndex(u => u.login === login);
             if (idx !== -1) {
                 // Ensure usersList remains a pure array without proxies if any
-                const newList = [...usersList];
-                newList.splice(idx, 1);
-                
-                await dbSet(dbRef(firebaseDb, 'appState/appUsers'), newList);
-                
+                const uLogin = usersList[idx].login;
                 // Aktualizujemy lokalnie
                 usersList.splice(idx, 1);
+                if (firestoreDb) await fsDeleteDoc(fsDoc(firestoreDb, "users", uLogin.replace(/[^a-zA-Z0-9]/g, '_')));
                 renderUsersTable();
                 await customAlert("Użytkownik został usunięty.");
             }
@@ -439,7 +436,7 @@ export async function addNewUser() {
     document.getElementById('formNewUserAdmin').checked = false;
 
     renderUsersTable();
-    dbSet(dbRef(firebaseDb, 'appState/appUsers'), newUsers);
+    if (firestoreDb) fsSetDoc(fsDoc(firestoreDb, "users", login.replace(/[^a-zA-Z0-9]/g, '_')), newUsers[newUsers.length-1]);
     await customAlert("Dodano użytkownika do listy uprawnień.");
 }
 
@@ -449,7 +446,7 @@ export async function resetProtocolCounter() {
             let state = window.getProjectState();
             state.protocolCounter = 0;
         }
-        dbSet(dbRef(firebaseDb, 'appState/protocolCounter'), 0);
+        if (firestoreDb) fsSetDoc(fsDoc(firestoreDb, "settings", "app"), { protocolCounter: 0 }, { merge: true });
         await customAlert("Numeracja kalkulacji została zresetowana.");
     }
 }
